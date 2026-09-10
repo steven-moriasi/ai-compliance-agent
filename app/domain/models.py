@@ -64,10 +64,14 @@ class Document(Base):
 
 class ComplianceCase(Base):
     __tablename__ = "compliance_cases"
+    __table_args__ = (
+        Index("ix_case_document_idempotency", "document_id", "idempotency_key", unique=True),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), index=True)
     prompt_template_id: Mapped[str] = mapped_column(ForeignKey("prompt_templates.id"))
+    idempotency_key: Mapped[str] = mapped_column(String(160))
     status: Mapped[CaseStatus] = mapped_column(
         Enum(CaseStatus, native_enum=False), default=CaseStatus.QUEUED, index=True
     )

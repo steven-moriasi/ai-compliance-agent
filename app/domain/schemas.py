@@ -89,6 +89,7 @@ class CaseRead(BaseModel):
     id: str
     document_id: str
     prompt_template_id: str
+    idempotency_key: str
     status: CaseStatus
     requested_by: str
     model_provider: str | None
