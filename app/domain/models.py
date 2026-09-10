@@ -4,7 +4,13 @@ from datetime import UTC, datetime
 from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.domain.enums import AnalysisOutcome, CaseStatus, PolicyStatus, ReviewDecision
+from app.domain.enums import (
+    AnalysisOutcome,
+    CaseStatus,
+    NotificationStatus,
+    PolicyStatus,
+    ReviewDecision,
+)
 from app.domain.types import JsonObject
 
 
@@ -93,8 +99,8 @@ class ComplianceCase(Base):
     error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     worker_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
-    fencing_token: Mapped[int] = mapped_column(Integer, default=0)
-    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    fencing_token: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     lease_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -130,4 +136,27 @@ class AuditEvent(Base):
     )
     correlation_id: Mapped[str] = mapped_column(String(160), index=True)
     details: Mapped[JsonObject] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class NotificationOutbox(Base):
+    __tablename__ = "notification_outbox"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    case_id: Mapped[str] = mapped_column(ForeignKey("compliance_cases.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(120))
+    payload: Mapped[JsonObject] = mapped_column(JSON)
+    status: Mapped[NotificationStatus] = mapped_column(
+        Enum(NotificationStatus, native_enum=False),
+        default=NotificationStatus.PENDING,
+        index=True,
+    )
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    fencing_token: Mapped[int] = mapped_column(Integer, default=0)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(240), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

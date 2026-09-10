@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     max_document_bytes: int = Field(default=262144, ge=1024, le=10485760)
     analysis_lease_seconds: int = Field(default=120, ge=30, le=3600)
     analysis_max_attempts: int = Field(default=3, ge=1, le=10)
+    notification_webhook_url: str | None = None
+    notification_webhook_secret: SecretStr | None = None
+    notification_lease_seconds: int = Field(default=60, ge=15, le=600)
+    notification_max_attempts: int = Field(default=5, ge=1, le=20)
 
 
 @lru_cache

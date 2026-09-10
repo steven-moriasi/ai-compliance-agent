@@ -25,3 +25,10 @@ class AnalysisOutcome(StrEnum):
 class ReviewDecision(StrEnum):
     APPROVE = "approve"
     REJECT = "reject"
+
+
+class NotificationStatus(StrEnum):
+    PENDING = "pending"
+    DELIVERING = "delivering"
+    SENT = "sent"
+    DEAD = "dead"

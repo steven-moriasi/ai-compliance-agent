@@ -36,8 +36,6 @@ def upgrade() -> None:
         "compliance_cases",
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.alter_column("compliance_cases", "fencing_token", server_default=None)
-    op.alter_column("compliance_cases", "attempts", server_default=None)
     op.create_index(
         "ix_review_records_case_unique",
         "review_records",

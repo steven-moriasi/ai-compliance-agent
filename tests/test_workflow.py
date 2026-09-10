@@ -1,12 +1,17 @@
+import hashlib
+import hmac
+import json
 from datetime import UTC, datetime, timedelta
 
+import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
-from app.domain.enums import CaseStatus
+from app.domain.enums import CaseStatus, NotificationStatus
 from app.services.analysis import AnalysisService
 from app.services.cases import claim_next_case, reap_expired_cases
+from app.services.notifications import claim_notification, deliver_notification
 from app.services.providers import DeterministicProvider
 
 
@@ -98,6 +103,31 @@ def test_human_reviewed_analysis_flow(
         "analysis_completed",
         "case_reviewed",
     ]
+    with session_factory() as session:
+        notification = claim_notification(session, lease_seconds=60)
+        assert notification is not None
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            expected = hmac.new(
+                notification.id.encode(),
+                request.content,
+                hashlib.sha256,
+            ).hexdigest()
+            assert request.headers["X-Compliance-Signature"] == f"sha256={expected}"
+            assert request.headers["Idempotency-Key"] == notification.id
+            assert json.loads(request.content)["case_id"] == case_id
+            return httpx.Response(204)
+
+        with httpx.Client(transport=httpx.MockTransport(handler)) as webhook_client:
+            delivered = deliver_notification(
+                session,
+                notification,
+                webhook_url="https://notifications.example.test/reviews",
+                webhook_secret=notification.id,
+                max_attempts=5,
+                client=webhook_client,
+            )
+        assert delivered.status == NotificationStatus.SENT
 
 
 def test_case_request_is_idempotent(client: TestClient) -> None:

@@ -15,6 +15,7 @@ from app.domain.schemas import AuditEventRead, CaseCreate, CaseRead, ReviewCreat
 from app.infrastructure.auth import AuthContext, require_roles
 from app.infrastructure.database import get_session
 from app.services.audit import append_audit_event
+from app.services.notifications import enqueue_review_notification
 
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
 AnalystContext = Annotated[AuthContext, Depends(require_roles("admin", "analyst"))]
@@ -141,6 +142,12 @@ def review_case(
         correlation_id=str(uuid.uuid4()),
         case_id=case.id,
         details={"decision": payload.decision.value, "analysis_hash": review.analysis_hash},
+    )
+    enqueue_review_notification(
+        session,
+        case,
+        decision=payload.decision.value,
+        reviewer_id=context.subject,
     )
     session.commit()
     session.refresh(review)
