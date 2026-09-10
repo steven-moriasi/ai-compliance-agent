@@ -87,14 +87,14 @@ class AnalysisService:
                         "fencing_token": case.fencing_token,
                     },
                 )
-        except (httpx.HTTPError, ValueError) as exc:
+        except (httpx.HTTPError, ValueError):
             completed = self._finalize(
                 case,
                 worker_id,
                 {
                     "status": CaseStatus.FAILED,
                     "error_code": "model_analysis_failed",
-                    "error_message": str(exc),
+                    "error_message": "Provider analysis did not complete",
                     "completed_at": datetime.now(UTC),
                     "lease_expires_at": None,
                 },

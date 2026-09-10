@@ -7,6 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings, get_settings
 from app.domain.models import Document, Policy, PromptTemplate
 from app.domain.schemas import (
     DocumentCreate,
@@ -28,6 +29,7 @@ ViewerContext = Annotated[
     Depends(require_roles("admin", "analyst", "reviewer", "viewer")),
 ]
 DatabaseSession = Annotated[Session, Depends(get_session)]
+ApplicationSettings = Annotated[Settings, Depends(get_settings)]
 
 
 @router.post("/policies", response_model=PolicyRead, status_code=status.HTTP_201_CREATED)
@@ -91,7 +93,10 @@ def create_document(
     payload: DocumentCreate,
     context: AnalystContext,
     session: DatabaseSession,
+    settings: ApplicationSettings,
 ) -> Document:
+    if len(payload.content.encode()) > settings.max_document_bytes:
+        raise HTTPException(status_code=413, detail="Document exceeds configured size limit")
     document = Document(
         **payload.model_dump(),
         content_hash=hashlib.sha256(payload.content.encode()).hexdigest(),

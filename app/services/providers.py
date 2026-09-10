@@ -88,10 +88,18 @@ class OpenAICompletion(BaseModel):
 class OpenAICompatibleProvider:
     name = "openai-compatible"
 
-    def __init__(self, *, base_url: str, api_key: str, model: str) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_key: str,
+        model: str,
+        client: httpx.Client | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
+        self.client = client
 
     def analyze(self, request: ModelRequest) -> ModelResponse:
         started = monotonic()
@@ -128,13 +136,20 @@ class OpenAICompatibleProvider:
                 },
             },
         }
-        with httpx.Client(timeout=30) as client:
-            response = client.post(
+        if self.client is None:
+            with httpx.Client(timeout=30) as client:
+                response = client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json=payload,
+                )
+        else:
+            response = self.client.post(
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 json=payload,
             )
-            response.raise_for_status()
+        response.raise_for_status()
         completion = OpenAICompletion.model_validate(response.json())
         if not completion.choices:
             raise ValueError("Model provider returned no choices")

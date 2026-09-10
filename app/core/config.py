@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +10,10 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     database_url: str = "sqlite:///./compliance.db"
+    auth_mode: Literal["development", "oidc"] = "development"
+    oidc_issuer: str | None = None
+    oidc_audience: str | None = None
+    oidc_jwks_url: str | None = None
     model_provider: str = "deterministic"
     model_base_url: str = "https://api.openai.com/v1"
     model_name: str = "gpt-4.1-mini"
