@@ -1,4 +1,4 @@
-FROM python:3.12.11-slim-bookworm AS builder
+FROM python:3.14.7-slim-bookworm AS builder
 
 WORKDIR /build
 COPY pyproject.toml README.md ./
@@ -6,7 +6,7 @@ COPY app ./app
 RUN python -m pip install --no-cache-dir build==1.2.2.post1 \
     && python -m build --wheel
 
-FROM python:3.12.11-slim-bookworm AS runtime
+FROM python:3.14.7-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
