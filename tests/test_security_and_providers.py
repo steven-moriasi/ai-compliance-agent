@@ -5,9 +5,11 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings, get_settings
 from app.domain.enums import AnalysisOutcome
+from app.domain.schemas import Citation, ModelAnalysis
 from app.main import app
 from app.services.providers import ModelRequest, OpenAICompatibleProvider
 from app.services.retrieval import RetrievedPolicy
+from app.services.validation import validate_analysis
 
 
 def test_oidc_mode_requires_bearer_token(client: TestClient) -> None:
@@ -115,3 +117,37 @@ def test_openai_compatible_provider_requests_strict_structured_output() -> None:
     assert response.analysis.outcome == AnalysisOutcome.COMPLIANT
     assert response.input_tokens == 120
     assert response.output_tokens == 40
+
+
+def test_validation_rejects_unretrieved_and_unsupported_citations() -> None:
+    policy = RetrievedPolicy(
+        id="policy-1",
+        name="retention",
+        version=2,
+        content="Customer records must be retained for seven years.",
+        score=1,
+    )
+    analysis = ModelAnalysis(
+        outcome=AnalysisOutcome.COMPLIANT,
+        confidence=0.92,
+        rationale="The model supplied citations that require deterministic verification.",
+        citations=[
+            Citation(
+                policy_id=policy.id,
+                policy_version=policy.version,
+                quote="Customer records may be deleted immediately.",
+            ),
+            Citation(
+                policy_id="policy-not-retrieved",
+                policy_version=1,
+                quote="An unrelated requirement.",
+            ),
+        ],
+    )
+
+    errors = validate_analysis(analysis, [policy], confidence_threshold=0.7)
+
+    assert errors == [
+        "citation_quote_not_found:policy-1:2",
+        "citation_not_retrieved:policy-not-retrieved:1",
+    ]

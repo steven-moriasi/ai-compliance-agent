@@ -185,6 +185,40 @@ def test_prompt_injection_signal_forces_review(
     assert client.get(f"/api/v1/cases/{created.json()['id']}").status_code == 200
 
 
+def test_provider_failure_is_persisted_without_exception_details(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, prompt, document = create_catalog(
+        client,
+        "Zebra quokka marmot.",
+    )
+    created = client.post(
+        "/api/v1/cases",
+        json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
+        headers={"X-Idempotency-Key": "provider-failure-0001"},
+    )
+
+    with session_factory() as session:
+        case = claim_next_case(session, worker_id="test-worker", lease_seconds=120)
+        assert case is not None
+        analyzed = AnalysisService(
+            session,
+            Settings(),
+            DeterministicProvider(),
+        ).analyze(
+            case,
+            correlation_id="analysis-correlation-0003",
+            worker_id="test-worker",
+        )
+
+    assert analyzed.status == CaseStatus.FAILED
+    assert analyzed.error_code == "model_analysis_failed"
+    assert analyzed.error_message == "Provider analysis did not complete"
+    assert "No relevant active policy" not in analyzed.error_message
+    assert client.get(f"/api/v1/cases/{created.json()['id']}").json()["status"] == "failed"
+
+
 def test_role_boundary_rejects_viewer_writes(client: TestClient) -> None:
     response = client.post(
         "/api/v1/policies",
