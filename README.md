@@ -65,6 +65,7 @@ See:
 - [Failure model](docs/FAILURE_MODEL.md)
 - [Operational runbook](docs/RUNBOOK.md)
 - [Architecture decisions](docs/adr)
+- [Portfolio evidence map](docs/PORTFOLIO_EVIDENCE.md)
 - [Principal Engineer self-review](docs/PRINCIPAL_ENGINEER_REVIEW.md)
 - [Risk-driven roadmap](docs/ROADMAP.md)
 
