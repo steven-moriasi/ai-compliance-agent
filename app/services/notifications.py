@@ -72,7 +72,7 @@ def claim_notification(
     session.commit()
     if claimed.rowcount != 1:
         return None
-    return session.get(NotificationOutbox, notification_id)
+    return session.get(NotificationOutbox, notification_id, populate_existing=True)
 
 
 def deliver_notification(

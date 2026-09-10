@@ -43,7 +43,7 @@ def claim_next_case(
     session.commit()
     if claimed.rowcount != 1:
         return None
-    return session.get(ComplianceCase, case_id)
+    return session.get(ComplianceCase, case_id, populate_existing=True)
 
 
 def reap_expired_cases(

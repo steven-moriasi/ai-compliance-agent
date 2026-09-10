@@ -5,10 +5,12 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
 from app.domain.enums import CaseStatus, NotificationStatus
+from app.domain.models import AuditEvent, NotificationOutbox
 from app.services.analysis import AnalysisService
 from app.services.cases import claim_next_case, reap_expired_cases
 from app.services.notifications import claim_notification, deliver_notification
@@ -224,6 +226,136 @@ def test_expired_analysis_is_requeued_with_new_fencing_token(
         assert second_claim.fencing_token == first_token + 1
         assert second_claim.attempts == 2
         assert second_claim.worker_id == "worker-two"
+
+
+def test_stale_worker_cannot_finalize_reclaimed_case(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, prompt, document = create_catalog(
+        client,
+        "Customer records are retained for seven years under the data retention policy.",
+    )
+    created = client.post(
+        "/api/v1/cases",
+        json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
+        headers={"X-Idempotency-Key": "lease-case-0002"},
+    )
+
+    with session_factory() as stale_session:
+        stale_claim = claim_next_case(stale_session, worker_id="stale-worker", lease_seconds=120)
+        assert stale_claim is not None
+        stale_claim.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        stale_session.commit()
+
+        with session_factory() as active_session:
+            assert reap_expired_cases(
+                active_session,
+                max_attempts=3,
+                correlation_id="reaper-2",
+            ) == (1, 0)
+            active_claim = claim_next_case(
+                active_session,
+                worker_id="active-worker",
+                lease_seconds=120,
+            )
+            assert active_claim is not None
+            active_token = active_claim.fencing_token
+
+        stale_result = AnalysisService(
+            stale_session,
+            Settings(),
+            DeterministicProvider(),
+        ).analyze(
+            stale_claim,
+            correlation_id="stale-analysis",
+            worker_id="stale-worker",
+        )
+        assert stale_result.status == CaseStatus.ANALYZING
+        assert stale_result.fencing_token == active_token
+
+    with session_factory() as session:
+        audit_types = list(
+            event.event_type
+            for event in session.scalars(
+                select(AuditEvent)
+                .where(AuditEvent.case_id == created.json()["id"])
+                .order_by(AuditEvent.created_at)
+            )
+        )
+        assert "analysis_completed" not in audit_types
+
+
+def test_expired_analysis_fails_after_attempt_limit(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, prompt, document = create_catalog(
+        client,
+        "Customer records are retained for seven years under the data retention policy.",
+    )
+    client.post(
+        "/api/v1/cases",
+        json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
+        headers={"X-Idempotency-Key": "lease-case-0003"},
+    )
+    with session_factory() as session:
+        claimed = claim_next_case(session, worker_id="failing-worker", lease_seconds=120)
+        assert claimed is not None
+        claimed.attempts = 3
+        claimed.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        session.commit()
+
+        assert reap_expired_cases(session, max_attempts=3, correlation_id="reaper-3") == (0, 1)
+        session.refresh(claimed)
+        assert claimed.status == CaseStatus.FAILED
+        assert claimed.error_code == "analysis_attempts_exhausted"
+
+
+def test_notification_retries_then_moves_to_dead_letter(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as session:
+        notification = NotificationOutbox(
+            case_id="case-for-failed-notification",
+            event_type="compliance_case_reviewed",
+            payload={"case_id": "case-for-failed-notification"},
+        )
+        session.add(notification)
+        session.commit()
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(503)
+
+        with httpx.Client(transport=httpx.MockTransport(handler)) as webhook_client:
+            first_claim = claim_notification(session, lease_seconds=60)
+            assert first_claim is not None
+            first_attempt = deliver_notification(
+                session,
+                first_claim,
+                webhook_url="https://notifications.example.test/reviews",
+                webhook_secret=notification.id,
+                max_attempts=2,
+                client=webhook_client,
+            )
+            assert first_attempt.status == NotificationStatus.PENDING
+            assert first_attempt.last_error == "Webhook delivery failed"
+
+            first_attempt.available_at = datetime.now(UTC) - timedelta(seconds=1)
+            session.commit()
+            second_claim = claim_notification(session, lease_seconds=60)
+            assert second_claim is not None
+            second_attempt = deliver_notification(
+                session,
+                second_claim,
+                webhook_url="https://notifications.example.test/reviews",
+                webhook_secret=notification.id,
+                max_attempts=2,
+                client=webhook_client,
+            )
+
+        assert second_attempt.status == NotificationStatus.DEAD
+        assert second_attempt.attempts == 2
 
 
 def test_operations_endpoints(client: TestClient) -> None:
