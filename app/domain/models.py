@@ -92,6 +92,12 @@ class ComplianceCase(Base):
     estimated_cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    worker_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    fencing_token: Mapped[int] = mapped_column(Integer, default=0)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -102,6 +108,7 @@ class ComplianceCase(Base):
 
 class ReviewRecord(Base):
     __tablename__ = "review_records"
+    __table_args__ = (Index("ix_review_records_case_unique", "case_id", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     case_id: Mapped[str] = mapped_column(ForeignKey("compliance_cases.id"), index=True)

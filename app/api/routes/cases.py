@@ -104,7 +104,9 @@ def review_case(
     context: ReviewerContext,
     session: DatabaseSession,
 ) -> ReviewRecord:
-    case = session.get(ComplianceCase, case_id)
+    case = session.scalar(
+        select(ComplianceCase).where(ComplianceCase.id == case_id).with_for_update()
+    )
     if case is None:
         raise HTTPException(status_code=404, detail="Compliance case not found")
     if case.status != CaseStatus.REVIEW_REQUIRED:

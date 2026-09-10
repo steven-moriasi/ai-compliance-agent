@@ -105,6 +105,7 @@ class CaseRead(BaseModel):
     latency_ms: int | None
     estimated_cost_usd: float | None
     error_code: str | None
+    attempts: int
     created_at: datetime
     completed_at: datetime | None
 

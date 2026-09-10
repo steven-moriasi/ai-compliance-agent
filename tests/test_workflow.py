@@ -1,10 +1,12 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
 from app.domain.enums import CaseStatus
 from app.services.analysis import AnalysisService
-from app.services.cases import claim_next_case
+from app.services.cases import claim_next_case, reap_expired_cases
 from app.services.providers import DeterministicProvider
 
 
@@ -60,13 +62,17 @@ def test_human_reviewed_analysis_flow(
     case_id = created.json()["id"]
 
     with session_factory() as session:
-        case = claim_next_case(session)
+        case = claim_next_case(session, worker_id="test-worker", lease_seconds=120)
         assert case is not None
         analyzed = AnalysisService(
             session,
             Settings(confidence_threshold=0.7),
             DeterministicProvider(),
-        ).analyze(case, correlation_id="analysis-correlation-0001")
+        ).analyze(
+            case,
+            correlation_id="analysis-correlation-0001",
+            worker_id="test-worker",
+        )
         assert analyzed.status == CaseStatus.REVIEW_REQUIRED
 
     result = client.get(f"/api/v1/cases/{case_id}")
@@ -129,13 +135,17 @@ def test_prompt_injection_signal_forces_review(
     )
 
     with session_factory() as session:
-        case = claim_next_case(session)
+        case = claim_next_case(session, worker_id="test-worker", lease_seconds=120)
         assert case is not None
         analyzed = AnalysisService(
             session,
             Settings(),
             DeterministicProvider(),
-        ).analyze(case, correlation_id="analysis-correlation-0002")
+        ).analyze(
+            case,
+            correlation_id="analysis-correlation-0002",
+            worker_id="test-worker",
+        )
 
     assert analyzed.status == CaseStatus.REVIEW_REQUIRED
     assert analyzed.injection_signals == ["instruction_override", "prompt_extraction"]
@@ -155,6 +165,35 @@ def test_role_boundary_rejects_viewer_writes(client: TestClient) -> None:
     )
 
     assert response.status_code == 403
+
+
+def test_expired_analysis_is_requeued_with_new_fencing_token(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, prompt, document = create_catalog(
+        client,
+        "Customer records are retained for seven years under the data retention policy.",
+    )
+    client.post(
+        "/api/v1/cases",
+        json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
+        headers={"X-Idempotency-Key": "lease-case-0001"},
+    )
+    with session_factory() as session:
+        first_claim = claim_next_case(session, worker_id="worker-one", lease_seconds=120)
+        assert first_claim is not None
+        first_token = first_claim.fencing_token
+        first_claim.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        session.commit()
+
+        assert reap_expired_cases(session, max_attempts=3, correlation_id="reaper-1") == (1, 0)
+        second_claim = claim_next_case(session, worker_id="worker-two", lease_seconds=120)
+
+        assert second_claim is not None
+        assert second_claim.fencing_token == first_token + 1
+        assert second_claim.attempts == 2
+        assert second_claim.worker_id == "worker-two"
 
 
 def test_operations_endpoints(client: TestClient) -> None:

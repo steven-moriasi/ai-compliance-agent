@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     model_output_cost_per_million: float = Field(default=0, ge=0)
     confidence_threshold: float = Field(default=0.7, ge=0, le=1)
     max_document_bytes: int = Field(default=262144, ge=1024, le=10485760)
+    analysis_lease_seconds: int = Field(default=120, ge=30, le=3600)
+    analysis_max_attempts: int = Field(default=3, ge=1, le=10)
 
 
 @lru_cache

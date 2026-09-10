@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 import httpx
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -19,11 +20,12 @@ class AnalysisService:
         self.settings = settings
         self.provider = provider
 
-    def analyze(self, case: ComplianceCase, correlation_id: str) -> ComplianceCase:
-        case.status = CaseStatus.ANALYZING
-        case.started_at = datetime.now(UTC)
-        self.session.commit()
-
+    def analyze(
+        self,
+        case: ComplianceCase,
+        correlation_id: str,
+        worker_id: str,
+    ) -> ComplianceCase:
         policies = retrieve_policies(self.session, case.document.content)
         injection_signals = detect_prompt_injection(case.document.content)
         try:
@@ -42,52 +44,94 @@ class AnalysisService:
             if injection_signals:
                 errors.append("prompt_injection_signal_requires_review")
 
-            case.model_provider = self.provider.name
-            case.model_name = self.provider.model
-            case.outcome = response.analysis.outcome
-            case.confidence = response.analysis.confidence
-            case.rationale = response.analysis.rationale
-            case.citations = [
-                citation.model_dump(mode="json") for citation in response.analysis.citations
-            ]
-            case.validation_errors = errors
-            case.injection_signals = injection_signals
-            case.input_tokens = response.input_tokens
-            case.output_tokens = response.output_tokens
-            case.latency_ms = response.latency_ms
-            case.estimated_cost_usd = (
+            estimated_cost = (
                 response.input_tokens * self.settings.model_input_cost_per_million
                 + response.output_tokens * self.settings.model_output_cost_per_million
             ) / 1_000_000
-            case.status = CaseStatus.REVIEW_REQUIRED
-            case.completed_at = datetime.now(UTC)
-            append_audit_event(
-                self.session,
-                event_type="analysis_completed",
-                actor_id="analysis-worker",
-                correlation_id=correlation_id,
-                case_id=case.id,
-                details={
+            completed = self._finalize(
+                case,
+                worker_id,
+                {
                     "model_provider": self.provider.name,
                     "model_name": self.provider.model,
-                    "validation_error_count": len(errors),
-                    "injection_signal_count": len(injection_signals),
+                    "outcome": response.analysis.outcome,
+                    "confidence": response.analysis.confidence,
+                    "rationale": response.analysis.rationale,
+                    "citations": [
+                        citation.model_dump(mode="json")
+                        for citation in response.analysis.citations
+                    ],
+                    "validation_errors": errors,
+                    "injection_signals": injection_signals,
+                    "input_tokens": response.input_tokens,
+                    "output_tokens": response.output_tokens,
+                    "latency_ms": response.latency_ms,
+                    "estimated_cost_usd": estimated_cost,
+                    "status": CaseStatus.REVIEW_REQUIRED,
+                    "completed_at": datetime.now(UTC),
+                    "lease_expires_at": None,
                 },
             )
+            if completed:
+                append_audit_event(
+                    self.session,
+                    event_type="analysis_completed",
+                    actor_id=worker_id,
+                    correlation_id=correlation_id,
+                    case_id=case.id,
+                    details={
+                        "model_provider": self.provider.name,
+                        "model_name": self.provider.model,
+                        "validation_error_count": len(errors),
+                        "injection_signal_count": len(injection_signals),
+                        "fencing_token": case.fencing_token,
+                    },
+                )
         except (httpx.HTTPError, ValueError) as exc:
-            case.status = CaseStatus.FAILED
-            case.error_code = "model_analysis_failed"
-            case.error_message = str(exc)
-            case.completed_at = datetime.now(UTC)
-            append_audit_event(
-                self.session,
-                event_type="analysis_failed",
-                actor_id="analysis-worker",
-                correlation_id=correlation_id,
-                case_id=case.id,
-                details={"error_code": case.error_code},
+            completed = self._finalize(
+                case,
+                worker_id,
+                {
+                    "status": CaseStatus.FAILED,
+                    "error_code": "model_analysis_failed",
+                    "error_message": str(exc),
+                    "completed_at": datetime.now(UTC),
+                    "lease_expires_at": None,
+                },
             )
+            if completed:
+                append_audit_event(
+                    self.session,
+                    event_type="analysis_failed",
+                    actor_id=worker_id,
+                    correlation_id=correlation_id,
+                    case_id=case.id,
+                    details={
+                        "error_code": "model_analysis_failed",
+                        "fencing_token": case.fencing_token,
+                    },
+                )
 
         self.session.commit()
         self.session.refresh(case)
         return case
+
+    def _finalize(
+        self,
+        case: ComplianceCase,
+        worker_id: str,
+        values: dict[str, object],
+    ) -> bool:
+        finalized = self.session.execute(
+            update(ComplianceCase)
+            .where(
+                ComplianceCase.id == case.id,
+                ComplianceCase.status == CaseStatus.ANALYZING,
+                ComplianceCase.worker_id == worker_id,
+                ComplianceCase.fencing_token == case.fencing_token,
+                ComplianceCase.lease_expires_at > datetime.now(UTC),
+            )
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        return finalized.rowcount == 1

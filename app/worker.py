@@ -12,14 +12,21 @@ from app.services.provider_factory import build_provider
 def run_worker() -> None:
     settings = get_settings()
     provider = build_provider(settings)
+    worker_id = f"analysis-worker-{uuid.uuid4()}"
     while True:
         with SessionLocal() as session:
-            case = claim_next_case(session)
+            case = claim_next_case(
+                session,
+                worker_id=worker_id,
+                lease_seconds=settings.analysis_lease_seconds,
+            )
             if case is None:
                 time.sleep(1)
                 continue
             analyzed = AnalysisService(session, settings, provider).analyze(
-                case, correlation_id=str(uuid.uuid4())
+                case,
+                correlation_id=str(uuid.uuid4()),
+                worker_id=worker_id,
             )
             ANALYSES.labels(status=analyzed.status.value, provider=provider.name).inc()
             if analyzed.latency_ms is not None:
