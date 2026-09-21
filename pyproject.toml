@@ -15,7 +15,7 @@ dependencies = [
     "httpx==0.28.1",
     "PyJWT[crypto]==2.10.1",
     "prometheus-client==0.26.0",
-    "psycopg[binary]==3.2.9",
+    "psycopg[binary]==3.3.5",
     "pydantic-settings==2.15.0",
     "sqlalchemy==2.0.52",
     "structlog==25.4.0",
