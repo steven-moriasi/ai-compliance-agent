@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 from datetime import UTC, datetime, timedelta
+from typing import Protocol, cast
 
 import httpx
 from sqlalchemy import or_, select, update
@@ -9,6 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.domain.enums import NotificationStatus
 from app.domain.models import ComplianceCase, NotificationOutbox
+
+
+class _RowCountResult(Protocol):
+    rowcount: int
 
 
 def enqueue_review_notification(
@@ -58,16 +63,19 @@ def claim_notification(
     notification_id = session.scalar(candidate)
     if notification_id is None:
         return None
-    claimed = session.execute(
-        update(NotificationOutbox)
-        .where(NotificationOutbox.id == notification_id)
-        .values(
-            status=NotificationStatus.DELIVERING,
-            attempts=NotificationOutbox.attempts + 1,
-            fencing_token=NotificationOutbox.fencing_token + 1,
-            lease_expires_at=now + timedelta(seconds=lease_seconds),
+    claimed = cast(
+        _RowCountResult,
+        session.execute(
+            update(NotificationOutbox)
+            .where(NotificationOutbox.id == notification_id)
+            .values(
+                status=NotificationStatus.DELIVERING,
+                attempts=NotificationOutbox.attempts + 1,
+                fencing_token=NotificationOutbox.fencing_token + 1,
+                lease_expires_at=now + timedelta(seconds=lease_seconds),
+            )
+            .execution_options(synchronize_session=False)
         )
-        .execution_options(synchronize_session=False)
     )
     session.commit()
     if claimed.rowcount != 1:

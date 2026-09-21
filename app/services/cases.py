@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Protocol, cast
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -6,6 +7,10 @@ from sqlalchemy.orm import Session
 from app.domain.enums import CaseStatus
 from app.domain.models import ComplianceCase
 from app.services.audit import append_audit_event
+
+
+class _RowCountResult(Protocol):
+    rowcount: int
 
 
 def claim_next_case(
@@ -25,20 +30,23 @@ def claim_next_case(
     if case_id is None:
         return None
     now = datetime.now(UTC)
-    claimed = session.execute(
-        update(ComplianceCase)
-        .where(
-            ComplianceCase.id == case_id,
-            ComplianceCase.status == CaseStatus.QUEUED,
-        )
-        .values(
-            status=CaseStatus.ANALYZING,
-            started_at=now,
-            worker_id=worker_id,
-            fencing_token=ComplianceCase.fencing_token + 1,
-            attempts=ComplianceCase.attempts + 1,
-            lease_expires_at=now + timedelta(seconds=lease_seconds),
-        )
+    claimed = cast(
+        _RowCountResult,
+        session.execute(
+            update(ComplianceCase)
+            .where(
+                ComplianceCase.id == case_id,
+                ComplianceCase.status == CaseStatus.QUEUED,
+            )
+            .values(
+                status=CaseStatus.ANALYZING,
+                started_at=now,
+                worker_id=worker_id,
+                fencing_token=ComplianceCase.fencing_token + 1,
+                attempts=ComplianceCase.attempts + 1,
+                lease_expires_at=now + timedelta(seconds=lease_seconds),
+            )
+        ),
     )
     session.commit()
     if claimed.rowcount != 1:

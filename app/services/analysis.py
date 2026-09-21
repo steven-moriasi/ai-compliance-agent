@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Protocol, cast
 
 import httpx
 from sqlalchemy import update
@@ -12,6 +13,10 @@ from app.services.injection import detect_prompt_injection
 from app.services.providers import ModelProvider, ModelRequest
 from app.services.retrieval import retrieve_policies
 from app.services.validation import validate_analysis
+
+
+class _RowCountResult(Protocol):
+    rowcount: int
 
 
 class AnalysisService:
@@ -122,16 +127,19 @@ class AnalysisService:
         worker_id: str,
         values: dict[str, object],
     ) -> bool:
-        finalized = self.session.execute(
-            update(ComplianceCase)
-            .where(
-                ComplianceCase.id == case.id,
-                ComplianceCase.status == CaseStatus.ANALYZING,
-                ComplianceCase.worker_id == worker_id,
-                ComplianceCase.fencing_token == case.fencing_token,
-                ComplianceCase.lease_expires_at > datetime.now(UTC),
+        finalized = cast(
+            _RowCountResult,
+            self.session.execute(
+                update(ComplianceCase)
+                .where(
+                    ComplianceCase.id == case.id,
+                    ComplianceCase.status == CaseStatus.ANALYZING,
+                    ComplianceCase.worker_id == worker_id,
+                    ComplianceCase.fencing_token == case.fencing_token,
+                    ComplianceCase.lease_expires_at > datetime.now(UTC),
+                )
+                .values(**values)
+                .execution_options(synchronize_session=False)
             )
-            .values(**values)
-            .execution_options(synchronize_session=False)
         )
         return finalized.rowcount == 1
