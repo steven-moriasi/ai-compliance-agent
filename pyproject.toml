@@ -7,7 +7,7 @@ name = "ai-compliance-agent"
 version = "0.1.0"
 description = "Human-reviewed compliance analysis reference implementation"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 license = { text = "MIT" }
 dependencies = [
     "alembic==1.16.1",
