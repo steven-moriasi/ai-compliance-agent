@@ -65,9 +65,19 @@ See:
 - [Failure model](docs/FAILURE_MODEL.md)
 - [Operational runbook](docs/RUNBOOK.md)
 - [Architecture decisions](docs/adr)
-- [Portfolio evidence map](docs/PORTFOLIO_EVIDENCE.md)
-- [Principal Engineer self-review](docs/PRINCIPAL_ENGINEER_REVIEW.md)
 - [Risk-driven roadmap](docs/ROADMAP.md)
+
+## Reading order
+
+Start with this README, then review the architecture and workflow sequences. Continue with the
+threat model, failure model, operational runbook, architecture decisions, and roadmap.
+
+## Limits
+
+- The repository does not establish production scale, availability, recovery, or incident outcomes.
+- It does not establish legal or regulatory correctness, certification, or formal assurance.
+- It does not establish model quality, fairness, or semantic retrieval quality.
+- It makes no claim about client history, cost savings, adoption, or business outcomes.
 
 ## Quick start
 

@@ -44,7 +44,7 @@ are ordered by risk reduction rather than feature volume.
 Retain the PostgreSQL queue until measurements show that polling, lock contention, connection use,
 or fan-out are limiting objectives. At that point, evaluate a broker while retaining database
 idempotency, domain state, and fencing. Do not introduce distributed infrastructure solely to make
-the portfolio appear complex.
+the system appear complex.
 
 ## Explicit non-goals
 
