@@ -22,8 +22,9 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: python -m pip install -e '.[dev]'
-      - run: ruff check app tests alembic
-      - run: mypy app
+      - run: ruff check app tests evals alembic
+      - run: mypy app evals
+      - run: python -m evals.run evals/cases/v1.json
       - run: >-
           pytest --cov=app --cov-report=term-missing --cov-report=xml
           --cov-fail-under=80
