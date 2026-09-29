@@ -4,7 +4,7 @@ from time import monotonic
 from typing import Protocol
 
 import httpx
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.domain.enums import AnalysisOutcome
 from app.domain.schemas import Citation, ModelAnalysis
@@ -16,6 +16,7 @@ class ModelRequest:
     system_prompt: str
     document: str
     policies: list[RetrievedPolicy]
+    validation_feedback: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,10 @@ class ModelProvider(Protocol):
     model: str
 
     def analyze(self, request: ModelRequest) -> ModelResponse: ...
+
+
+class MalformedModelOutputError(ValueError):
+    pass
 
 
 class DeterministicProvider:
@@ -112,19 +117,24 @@ class OpenAICompatibleProvider:
             }
             for policy in request.policies
         ]
+        user_request: dict[str, object] = {
+            "instruction": "Analyze only against the supplied policy context.",
+            "untrusted_document": request.document,
+            "policy_context": policy_context,
+        }
+        if request.validation_feedback:
+            user_request["instruction"] = (
+                "Revise the prior analysis against the supplied policy context and correct "
+                "every validation feedback item."
+            )
+            user_request["validation_feedback"] = list(request.validation_feedback)
         payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": request.system_prompt},
                 {
                     "role": "user",
-                    "content": json.dumps(
-                        {
-                            "instruction": "Analyze only against the supplied policy context.",
-                            "untrusted_document": request.document,
-                            "policy_context": policy_context,
-                        }
-                    ),
+                    "content": json.dumps(user_request),
                 },
             ],
             "response_format": {
@@ -152,8 +162,11 @@ class OpenAICompatibleProvider:
         response.raise_for_status()
         completion = OpenAICompletion.model_validate(response.json())
         if not completion.choices:
-            raise ValueError("Model provider returned no choices")
-        analysis = ModelAnalysis.model_validate_json(completion.choices[0].message.content)
+            raise MalformedModelOutputError("Model provider returned no choices")
+        try:
+            analysis = ModelAnalysis.model_validate_json(completion.choices[0].message.content)
+        except ValidationError as error:
+            raise MalformedModelOutputError("Model output did not match the schema") from error
         return ModelResponse(
             analysis=analysis,
             input_tokens=completion.usage.prompt_tokens,

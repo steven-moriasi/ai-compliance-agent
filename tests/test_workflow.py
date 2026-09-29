@@ -9,12 +9,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
-from app.domain.enums import CaseStatus, NotificationStatus
+from app.domain.enums import AnalysisOutcome, CaseStatus, NotificationStatus
 from app.domain.models import AuditEvent, NotificationOutbox
+from app.domain.schemas import Citation, ModelAnalysis
 from app.services.analysis import AnalysisService
 from app.services.cases import claim_next_case, reap_expired_cases
 from app.services.notifications import claim_notification, deliver_notification
-from app.services.providers import DeterministicProvider
+from app.services.providers import (
+    DeterministicProvider,
+    ModelRequest,
+    ModelResponse,
+)
 
 
 def create_catalog(client: TestClient, document_content: str) -> tuple[dict[str, object], ...]:
@@ -50,6 +55,58 @@ def create_catalog(client: TestClient, document_content: str) -> tuple[dict[str,
         },
     ).json()
     return policy, prompt, document
+
+
+class FixingProvider:
+    name = "fixing-fixture"
+    model = "fixing-fixture-v1"
+
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
+
+    def analyze(self, request: ModelRequest) -> ModelResponse:
+        self.requests.append(request)
+        policy = request.policies[0]
+        quote = (
+            "Customer records may be deleted immediately."
+            if len(self.requests) == 1
+            else policy.content
+        )
+        return ModelResponse(
+            analysis=ModelAnalysis(
+                outcome=AnalysisOutcome.COMPLIANT,
+                confidence=0.9,
+                rationale="The procedure is assessed against the cited policy.",
+                citations=[
+                    Citation(
+                        policy_id=policy.id,
+                        policy_version=policy.version,
+                        quote=quote,
+                    )
+                ],
+            ),
+            input_tokens=10,
+            output_tokens=5,
+            latency_ms=1,
+        )
+
+
+class MalformedProvider:
+    name = "malformed-fixture"
+    model = "malformed-fixture-v1"
+
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
+
+    def analyze(self, request: ModelRequest) -> ModelResponse:
+        self.requests.append(request)
+        analysis = ModelAnalysis.model_validate({"outcome": "compliant"})
+        return ModelResponse(
+            analysis=analysis,
+            input_tokens=0,
+            output_tokens=0,
+            latency_ms=1,
+        )
 
 
 def test_human_reviewed_analysis_flow(
@@ -102,6 +159,7 @@ def test_human_reviewed_analysis_flow(
     audit = client.get(f"/api/v1/cases/{case_id}/audit").json()
     assert [event["event_type"] for event in audit] == [
         "case_requested",
+        "analysis_attempted",
         "analysis_completed",
         "case_reviewed",
     ]
@@ -185,6 +243,116 @@ def test_prompt_injection_signal_forces_review(
     assert client.get(f"/api/v1/cases/{created.json()['id']}").status_code == 200
 
 
+def test_analysis_retries_fixable_output_with_validation_feedback(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, prompt, document = create_catalog(
+        client,
+        "Customer records are retained for seven years under the data retention policy.",
+    )
+    created = client.post(
+        "/api/v1/cases",
+        json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
+        headers={"X-Idempotency-Key": "retry-fixable-output-0001"},
+    )
+    provider = FixingProvider()
+
+    with session_factory() as session:
+        case = claim_next_case(session, worker_id="test-worker", lease_seconds=120)
+        assert case is not None
+        analyzed = AnalysisService(
+            session,
+            Settings(),
+            provider,
+        ).analyze(
+            case,
+            correlation_id="analysis-retry-fixable-output",
+            worker_id="test-worker",
+        )
+        attempt_events = list(
+            session.scalars(
+                select(AuditEvent)
+                .where(
+                    AuditEvent.case_id == created.json()["id"],
+                    AuditEvent.event_type == "analysis_attempted",
+                )
+                .order_by(AuditEvent.created_at)
+            )
+        )
+
+    assert analyzed.status == CaseStatus.REVIEW_REQUIRED
+    assert analyzed.validation_errors == []
+    assert analyzed.input_tokens == 20
+    assert analyzed.output_tokens == 10
+    assert len(provider.requests) == 2
+    assert provider.requests[0].validation_feedback == ()
+    assert provider.requests[1].validation_feedback == (
+        f"citation_quote_not_found:{provider.requests[0].policies[0].id}:1",
+    )
+    assert [event.details["result"] for event in attempt_events] == [
+        "validation_failed",
+        "valid_output",
+    ]
+    assert attempt_events[0].details["validation_error_codes"] == ["citation_quote_not_found"]
+
+
+def test_repeated_malformed_output_requires_review_without_raw_output(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, prompt, document = create_catalog(
+        client,
+        "Customer records are retained for seven years under the data retention policy.",
+    )
+    created = client.post(
+        "/api/v1/cases",
+        json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
+        headers={"X-Idempotency-Key": "malformed-output-0001"},
+    )
+    provider = MalformedProvider()
+
+    with session_factory() as session:
+        case = claim_next_case(session, worker_id="test-worker", lease_seconds=120)
+        assert case is not None
+        analyzed = AnalysisService(
+            session,
+            Settings(),
+            provider,
+        ).analyze(
+            case,
+            correlation_id="analysis-malformed-output",
+            worker_id="test-worker",
+        )
+        audit_events = list(
+            session.scalars(
+                select(AuditEvent)
+                .where(AuditEvent.case_id == created.json()["id"])
+                .order_by(AuditEvent.created_at)
+            )
+        )
+
+    assert analyzed.status == CaseStatus.REVIEW_REQUIRED
+    assert analyzed.error_code == "malformed_model_output"
+    assert analyzed.validation_errors == ["malformed_model_output"]
+    assert len(provider.requests) == 2
+    assert provider.requests[1].validation_feedback == ("malformed_model_output",)
+    assert [event.event_type for event in audit_events] == [
+        "case_requested",
+        "analysis_attempted",
+        "analysis_attempted",
+        "analysis_completed",
+    ]
+    attempt_details = [
+        event.details for event in audit_events if event.event_type == "analysis_attempted"
+    ]
+    assert [details["result"] for details in attempt_details] == [
+        "malformed_output",
+        "malformed_output",
+    ]
+    assert all("raw_output" not in details for details in attempt_details)
+
+
 def test_provider_failure_is_persisted_without_exception_details(
     client: TestClient,
     session_factory: sessionmaker[Session],
@@ -217,6 +385,20 @@ def test_provider_failure_is_persisted_without_exception_details(
     assert analyzed.error_message == "Provider analysis did not complete"
     assert "No relevant active policy" not in analyzed.error_message
     assert client.get(f"/api/v1/cases/{created.json()['id']}").json()["status"] == "failed"
+    with session_factory() as session:
+        audit_events = list(
+            session.scalars(
+                select(AuditEvent)
+                .where(AuditEvent.case_id == created.json()["id"])
+                .order_by(AuditEvent.created_at)
+            )
+        )
+    assert [event.event_type for event in audit_events] == [
+        "case_requested",
+        "analysis_attempted",
+        "analysis_failed",
+    ]
+    assert audit_events[1].details["result"] == "provider_error"
 
 
 def test_role_boundary_rejects_viewer_writes(client: TestClient) -> None:
@@ -318,6 +500,7 @@ def test_stale_worker_cannot_finalize_reclaimed_case(
             )
         )
         assert "analysis_completed" not in audit_types
+        assert "analysis_attempted" not in audit_types
 
 
 def test_expired_analysis_fails_after_attempt_limit(

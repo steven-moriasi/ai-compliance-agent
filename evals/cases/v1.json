@@ -36,6 +36,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_attempted",
           "analysis_completed"
         ]
       }
@@ -69,6 +70,18 @@
               "quote": "Passwords require twelve symbols and quarterly rotation."
             }
           ]
+        },
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The procedure follows a requirement that was not retrieved.",
+          "citations": [
+            {
+              "policy_id": "policy-passwords",
+              "policy_version": 1,
+              "quote": "Passwords require twelve symbols and quarterly rotation."
+            }
+          ]
         }
       ],
       "expected": {
@@ -81,8 +94,10 @@
         "injection_signals": [],
         "status": "review_required",
         "error_code": null,
-        "provider_attempts": 1,
+        "provider_attempts": 2,
         "audit_events": [
+          "analysis_attempted",
+          "analysis_attempted",
           "analysis_completed"
         ]
       }
@@ -110,6 +125,18 @@
               "quote": "Customer records may be deleted immediately."
             }
           ]
+        },
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The procedure is supported by the supplied citation.",
+          "citations": [
+            {
+              "policy_id": "policy-retention",
+              "policy_version": 1,
+              "quote": "Customer records may be deleted immediately."
+            }
+          ]
         }
       ],
       "expected": {
@@ -122,8 +149,10 @@
         "injection_signals": [],
         "status": "review_required",
         "error_code": null,
-        "provider_attempts": 1,
+        "provider_attempts": 2,
         "audit_events": [
+          "analysis_attempted",
+          "analysis_attempted",
           "analysis_completed"
         ]
       }
@@ -151,6 +180,18 @@
               "quote": "Customer"
             }
           ]
+        },
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The procedure aligns with the cited retention requirement.",
+          "citations": [
+            {
+              "policy_id": "policy-retention",
+              "policy_version": 1,
+              "quote": "Customer"
+            }
+          ]
         }
       ],
       "expected": {
@@ -163,8 +204,10 @@
         "injection_signals": [],
         "status": "review_required",
         "error_code": null,
-        "provider_attempts": 1,
+        "provider_attempts": 2,
         "audit_events": [
+          "analysis_attempted",
+          "analysis_attempted",
           "analysis_completed"
         ]
       }
@@ -192,6 +235,18 @@
               "quote": "Reports must be submitted within 30 days after notice."
             }
           ]
+        },
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The filing is due within 15 days after notice.",
+          "citations": [
+            {
+              "policy_id": "policy-reporting",
+              "policy_version": 1,
+              "quote": "Reports must be submitted within 30 days after notice."
+            }
+          ]
         }
       ],
       "expected": {
@@ -204,8 +259,10 @@
         "injection_signals": [],
         "status": "review_required",
         "error_code": null,
-        "provider_attempts": 1,
+        "provider_attempts": 2,
         "audit_events": [
+          "analysis_attempted",
+          "analysis_attempted",
           "analysis_completed"
         ]
       }
@@ -252,6 +309,49 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_attempted",
+          "analysis_completed"
+        ]
+      }
+    },
+    {
+      "id": "malformed-model-output",
+      "document": "Our procedure retains customer records for seven years.",
+      "policies": [
+        {
+          "id": "policy-retention",
+          "name": "data-retention",
+          "version": 1,
+          "content": "Customer records must be retained for seven years."
+        }
+      ],
+      "provider_outputs": [
+        {
+          "outcome": "compliant",
+          "confidence": "not-a-number",
+          "rationale": "The first response is malformed.",
+          "citations": []
+        },
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The second response is also malformed."
+        }
+      ],
+      "expected": {
+        "retrieved_policy_ids": [
+          "policy-retention"
+        ],
+        "validation_errors": [
+          "malformed_model_output"
+        ],
+        "injection_signals": [],
+        "status": "review_required",
+        "error_code": "malformed_model_output",
+        "provider_attempts": 2,
+        "audit_events": [
+          "analysis_attempted",
+          "analysis_attempted",
           "analysis_completed"
         ]
       }
@@ -296,6 +396,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_attempted",
           "analysis_completed"
         ]
       }

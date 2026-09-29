@@ -1,13 +1,18 @@
 import json
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings, get_settings
 from app.domain.enums import AnalysisOutcome
 from app.domain.schemas import Citation, ModelAnalysis
 from app.main import app
-from app.services.providers import ModelRequest, OpenAICompatibleProvider
+from app.services.providers import (
+    MalformedModelOutputError,
+    ModelRequest,
+    OpenAICompatibleProvider,
+)
 from app.services.retrieval import RetrievedPolicy
 from app.services.validation import validate_analysis
 
@@ -71,7 +76,9 @@ def test_openai_compatible_provider_requests_strict_structured_output() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
         assert payload["response_format"]["json_schema"]["strict"] is True
-        assert "untrusted_document" in payload["messages"][1]["content"]
+        user_request = json.loads(payload["messages"][1]["content"])
+        assert "untrusted_document" in user_request
+        assert user_request["validation_feedback"] == ["citation_quote_not_found:policy-1:2"]
         return httpx.Response(
             200,
             json={
@@ -111,12 +118,48 @@ def test_openai_compatible_provider_requests_strict_structured_output() -> None:
                 system_prompt="Return a grounded structured compliance assessment.",
                 document="This procedure retains customer records for seven years.",
                 policies=[policy],
+                validation_feedback=("citation_quote_not_found:policy-1:2",),
             )
         )
 
     assert response.analysis.outcome == AnalysisOutcome.COMPLIANT
     assert response.input_tokens == 120
     assert response.output_tokens == 40
+
+
+def test_openai_compatible_provider_classifies_malformed_structured_output() -> None:
+    policy = RetrievedPolicy(
+        id="policy-1",
+        name="retention",
+        version=2,
+        content="Customer records must be retained for seven years.",
+        score=1,
+    )
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "not valid json"}}],
+                "usage": {"prompt_tokens": 120, "completion_tokens": 3},
+            },
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as model_client:
+        provider = OpenAICompatibleProvider(
+            base_url="https://model.example.test/v1",
+            api_key="test-only-key",
+            model="structured-model",
+            client=model_client,
+        )
+        with pytest.raises(MalformedModelOutputError):
+            provider.analyze(
+                ModelRequest(
+                    system_prompt="Return a grounded structured compliance assessment.",
+                    document="This procedure retains customer records for seven years.",
+                    policies=[policy],
+                )
+            )
 
 
 def test_validation_rejects_unretrieved_and_unsupported_citations() -> None:
