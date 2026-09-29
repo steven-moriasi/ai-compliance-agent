@@ -32,7 +32,7 @@ def retrieve_policies(session: Session, document: str, limit: int = 5) -> list[R
     for policy in policies:
         policy_tokens = _tokens(policy.content)
         overlap = len(document_tokens & policy_tokens)
-        score = overlap / max(len(policy_tokens), 1)
+        score = overlap / max(len(document_tokens), 1)
         if score > 0:
             ranked.append(
                 RetrievedPolicy(
