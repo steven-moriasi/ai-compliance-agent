@@ -109,6 +109,18 @@ class MalformedProvider:
         )
 
 
+class FailingProvider:
+    name = "failing-fixture"
+    model = "failing-fixture-v1"
+
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
+
+    def analyze(self, request: ModelRequest) -> ModelResponse:
+        self.requests.append(request)
+        raise ValueError("Provider detail that must not be persisted")
+
+
 def test_human_reviewed_analysis_flow(
     client: TestClient,
     session_factory: sessionmaker[Session],
@@ -353,7 +365,7 @@ def test_repeated_malformed_output_requires_review_without_raw_output(
     assert all("raw_output" not in details for details in attempt_details)
 
 
-def test_provider_failure_is_persisted_without_exception_details(
+def test_no_relevant_source_requires_review_without_provider_call(
     client: TestClient,
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -364,8 +376,9 @@ def test_provider_failure_is_persisted_without_exception_details(
     created = client.post(
         "/api/v1/cases",
         json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
-        headers={"X-Idempotency-Key": "provider-failure-0001"},
+        headers={"X-Idempotency-Key": "no-relevant-source-0001"},
     )
+    provider = FailingProvider()
 
     with session_factory() as session:
         case = claim_next_case(session, worker_id="test-worker", lease_seconds=120)
@@ -373,7 +386,62 @@ def test_provider_failure_is_persisted_without_exception_details(
         analyzed = AnalysisService(
             session,
             Settings(),
-            DeterministicProvider(),
+            provider,
+        ).analyze(
+            case,
+            correlation_id="analysis-no-relevant-source",
+            worker_id="test-worker",
+        )
+
+    assert analyzed.status == CaseStatus.REVIEW_REQUIRED
+    assert analyzed.outcome == AnalysisOutcome.NEEDS_REVIEW
+    assert analyzed.error_code == "no_relevant_source"
+    assert analyzed.error_message == "No relevant active policy source was retrieved"
+    assert analyzed.validation_errors == ["no_relevant_source"]
+    assert analyzed.citations == []
+    assert analyzed.input_tokens == 0
+    assert analyzed.output_tokens == 0
+    assert analyzed.latency_ms == 0
+    assert analyzed.estimated_cost_usd == 0
+    assert provider.requests == []
+    assert client.get(f"/api/v1/cases/{created.json()['id']}").json()["status"] == "review_required"
+    with session_factory() as session:
+        audit_events = list(
+            session.scalars(
+                select(AuditEvent)
+                .where(AuditEvent.case_id == created.json()["id"])
+                .order_by(AuditEvent.created_at)
+            )
+        )
+    assert [event.event_type for event in audit_events] == [
+        "case_requested",
+        "analysis_completed",
+    ]
+    assert audit_events[1].details["provider_invoked"] is False
+
+
+def test_provider_failure_is_persisted_without_exception_details(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, prompt, document = create_catalog(
+        client,
+        "Customer records are retained for seven years.",
+    )
+    created = client.post(
+        "/api/v1/cases",
+        json={"document_id": document["id"], "prompt_template_id": prompt["id"]},
+        headers={"X-Idempotency-Key": "provider-failure-0001"},
+    )
+    provider = FailingProvider()
+
+    with session_factory() as session:
+        case = claim_next_case(session, worker_id="test-worker", lease_seconds=120)
+        assert case is not None
+        analyzed = AnalysisService(
+            session,
+            Settings(),
+            provider,
         ).analyze(
             case,
             correlation_id="analysis-correlation-0003",
@@ -383,7 +451,8 @@ def test_provider_failure_is_persisted_without_exception_details(
     assert analyzed.status == CaseStatus.FAILED
     assert analyzed.error_code == "model_analysis_failed"
     assert analyzed.error_message == "Provider analysis did not complete"
-    assert "No relevant active policy" not in analyzed.error_message
+    assert "Provider detail" not in analyzed.error_message
+    assert len(provider.requests) == 1
     assert client.get(f"/api/v1/cases/{created.json()['id']}").json()["status"] == "failed"
     with session_factory() as session:
         audit_events = list(

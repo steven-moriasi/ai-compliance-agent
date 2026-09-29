@@ -17,5 +17,6 @@ def test_v1_evaluation_set() -> None:
         "irrelevant-short-policy-ranking",
         "malformed-model-output",
         "prompt-injection-attempt",
+        "no-relevant-source",
     ]
     assert all(result.passed for result in results)

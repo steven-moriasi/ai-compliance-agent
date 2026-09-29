@@ -7,7 +7,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.domain.enums import CaseStatus
+from app.domain.enums import AnalysisOutcome, CaseStatus
 from app.domain.models import ComplianceCase
 from app.domain.types import JsonObject
 from app.services.audit import append_audit_event
@@ -49,6 +49,29 @@ class AnalysisService:
     ) -> ComplianceCase:
         policies = retrieve_policies(self.session, case.document.content)
         injection_signals = detect_prompt_injection(case.document.content)
+        if not policies:
+            validation_errors = ["no_relevant_source"]
+            if injection_signals:
+                validation_errors.append("prompt_injection_signal_requires_review")
+            completed = self._finalize_no_relevant_source(
+                case,
+                worker_id,
+                validation_errors,
+                injection_signals,
+            )
+            if completed:
+                self._append_completion_event(
+                    case,
+                    worker_id,
+                    correlation_id,
+                    validation_errors=validation_errors,
+                    injection_signals=injection_signals,
+                    provider_invoked=False,
+                )
+            self.session.commit()
+            self.session.refresh(case)
+            return case
+
         attempt_events: list[JsonObject] = []
         validation_feedback: tuple[str, ...] = ()
         input_tokens = 0
@@ -261,6 +284,35 @@ class AnalysisService:
             },
         )
 
+    def _finalize_no_relevant_source(
+        self,
+        case: ComplianceCase,
+        worker_id: str,
+        validation_errors: list[str],
+        injection_signals: list[str],
+    ) -> bool:
+        message = "No relevant active policy source was retrieved"
+        return self._finalize(
+            case,
+            worker_id,
+            {
+                "outcome": AnalysisOutcome.NEEDS_REVIEW,
+                "rationale": message,
+                "citations": [],
+                "validation_errors": validation_errors,
+                "injection_signals": injection_signals,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "latency_ms": 0,
+                "estimated_cost_usd": 0,
+                "status": CaseStatus.REVIEW_REQUIRED,
+                "error_code": "no_relevant_source",
+                "error_message": message,
+                "completed_at": datetime.now(UTC),
+                "lease_expires_at": None,
+            },
+        )
+
     def _attempt_event(
         self,
         case: ComplianceCase,
@@ -313,6 +365,7 @@ class AnalysisService:
         *,
         validation_errors: list[str],
         injection_signals: list[str],
+        provider_invoked: bool = True,
     ) -> None:
         append_audit_event(
             self.session,
@@ -323,6 +376,7 @@ class AnalysisService:
             details={
                 "model_provider": self.provider.name,
                 "model_name": self.provider.model,
+                "provider_invoked": provider_invoked,
                 "validation_error_count": len(validation_errors),
                 "injection_signal_count": len(injection_signals),
                 "fencing_token": case.fencing_token,

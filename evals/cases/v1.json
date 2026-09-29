@@ -400,6 +400,45 @@
           "analysis_completed"
         ]
       }
+    },
+    {
+      "id": "no-relevant-source",
+      "document": "Forklift maintenance inspections passed without incident.",
+      "policies": [
+        {
+          "id": "policy-retention",
+          "name": "data-retention",
+          "version": 1,
+          "content": "Customer records must be retained for seven years."
+        }
+      ],
+      "provider_outputs": [
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "This fixture must not be requested.",
+          "citations": [
+            {
+              "policy_id": "policy-retention",
+              "policy_version": 1,
+              "quote": "Customer records must be retained for seven years."
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "retrieved_policy_ids": [],
+        "validation_errors": [
+          "no_relevant_source"
+        ],
+        "injection_signals": [],
+        "status": "review_required",
+        "error_code": "no_relevant_source",
+        "provider_attempts": 0,
+        "audit_events": [
+          "analysis_completed"
+        ]
+      }
     }
   ]
 }
