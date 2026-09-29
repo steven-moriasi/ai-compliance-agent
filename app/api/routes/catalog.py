@@ -5,15 +5,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import Settings, get_settings
-from app.domain.models import Document, Policy, PromptTemplate
+from app.domain.models import Document, Policy, PolicySection, PromptTemplate
 from app.domain.schemas import (
     DocumentCreate,
     DocumentRead,
     PolicyCreate,
     PolicyRead,
+    PolicySectionCreate,
     PromptTemplateCreate,
     PromptTemplateRead,
 )
@@ -34,10 +35,19 @@ ApplicationSettings = Annotated[Settings, Depends(get_settings)]
 
 @router.post("/policies", response_model=PolicyRead, status_code=status.HTTP_201_CREATED)
 def create_policy(payload: PolicyCreate, context: AdminContext, session: DatabaseSession) -> Policy:
+    sections = payload.sections or [
+        PolicySectionCreate(
+            section_ref="document",
+            heading=payload.name,
+            text=payload.content,
+            position=0,
+        )
+    ]
     policy = Policy(
-        **payload.model_dump(),
+        **payload.model_dump(exclude={"sections"}),
         content_hash=hashlib.sha256(payload.content.encode()).hexdigest(),
         created_by=context.subject,
+        sections=[PolicySection(**section.model_dump()) for section in sections],
     )
     session.add(policy)
     try:
@@ -53,7 +63,13 @@ def create_policy(payload: PolicyCreate, context: AdminContext, session: Databas
 
 @router.get("/policies", response_model=list[PolicyRead])
 def list_policies(_context: ViewerContext, session: DatabaseSession) -> list[Policy]:
-    return list(session.scalars(select(Policy).order_by(Policy.name, Policy.version)))
+    return list(
+        session.scalars(
+            select(Policy)
+            .options(selectinload(Policy.sections))
+            .order_by(Policy.name, Policy.version)
+        )
+    )
 
 
 @router.post("/prompts", response_model=PromptTemplateRead, status_code=status.HTTP_201_CREATED)

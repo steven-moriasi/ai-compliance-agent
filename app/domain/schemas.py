@@ -1,27 +1,70 @@
-from datetime import datetime
+from datetime import date, datetime
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.enums import AnalysisOutcome, CaseStatus, PolicyStatus, ReviewDecision
 from app.domain.types import JsonObject
 
 
-class PolicyCreate(BaseModel):
+class PolicySectionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    section_ref: str = Field(min_length=1, max_length=120)
+    heading: str | None = Field(default=None, max_length=240)
+    text: str = Field(min_length=1, max_length=100000)
+    position: int = Field(ge=0)
+
+
+class PolicySectionRead(PolicySectionCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+
+
+class PolicyBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=3, max_length=160)
     version: int = Field(default=1, ge=1)
     status: PolicyStatus = PolicyStatus.DRAFT
     content: str = Field(min_length=20, max_length=100000)
+    effective_from: date | None = None
+    effective_to: date | None = None
+
+    @model_validator(mode="after")
+    def validate_effective_window(self) -> Self:
+        if (
+            self.effective_from is not None
+            and self.effective_to is not None
+            and self.effective_to <= self.effective_from
+        ):
+            raise ValueError("effective_to must be later than effective_from")
+        return self
 
 
-class PolicyRead(PolicyCreate):
+class PolicyCreate(PolicyBase):
+    sections: list[PolicySectionCreate] = Field(default_factory=list, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_sections(self) -> Self:
+        section_refs = [section.section_ref for section in self.sections]
+        positions = [section.position for section in self.sections]
+        if len(section_refs) != len(set(section_refs)):
+            raise ValueError("section_ref values must be unique")
+        if len(positions) != len(set(positions)):
+            raise ValueError("section positions must be unique")
+        return self
+
+
+class PolicyRead(PolicyBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
     content_hash: str
     created_by: str
     created_at: datetime
+    sections: list[PolicySectionRead]
 
 
 class PromptTemplateCreate(BaseModel):

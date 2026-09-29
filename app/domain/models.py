@@ -1,7 +1,7 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Date, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.domain.enums import (
@@ -38,8 +38,35 @@ class Policy(Base):
     )
     content: Mapped[str] = mapped_column(Text)
     content_hash: Mapped[str] = mapped_column(String(64))
+    effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_by: Mapped[str] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    sections: Mapped[list["PolicySection"]] = relationship(
+        back_populates="policy",
+        cascade="all, delete-orphan",
+        order_by="PolicySection.position",
+    )
+
+
+class PolicySection(Base):
+    __tablename__ = "policy_sections"
+    __table_args__ = (
+        Index("ix_policy_section_ref_unique", "policy_id", "section_ref", unique=True),
+        Index("ix_policy_section_position_unique", "policy_id", "position", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    policy_id: Mapped[str] = mapped_column(
+        ForeignKey("policies.id", ondelete="CASCADE"),
+        index=True,
+    )
+    section_ref: Mapped[str] = mapped_column(String(120))
+    heading: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    text: Mapped[str] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer)
+
+    policy: Mapped[Policy] = relationship(back_populates="sections")
 
 
 class PromptTemplate(Base):
