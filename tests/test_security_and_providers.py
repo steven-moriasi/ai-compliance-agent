@@ -151,3 +151,112 @@ def test_validation_rejects_unretrieved_and_unsupported_citations() -> None:
         "citation_quote_not_found:policy-1:2",
         "citation_not_retrieved:policy-not-retrieved:1",
     ]
+
+
+def test_validation_requires_meaningful_word_bounded_quotes() -> None:
+    policy = RetrievedPolicy(
+        id="policy-1",
+        name="retention",
+        version=2,
+        content="Customer records must be retained for seven years.",
+        score=1,
+    )
+    analysis = ModelAnalysis(
+        outcome=AnalysisOutcome.COMPLIANT,
+        confidence=0.92,
+        rationale="The citations require deterministic verification.",
+        citations=[
+            Citation(
+                policy_id=policy.id,
+                policy_version=policy.version,
+                quote="Customer",
+            ),
+            Citation(
+                policy_id=policy.id,
+                policy_version=policy.version,
+                quote="ustomer records must be retained",
+            ),
+        ],
+    )
+
+    errors = validate_analysis(analysis, [policy], confidence_threshold=0.7)
+
+    assert errors == [
+        "citation_quote_too_short:policy-1:2",
+        "citation_quote_not_found:policy-1:2",
+    ]
+
+
+def test_validation_normalizes_only_whitespace_for_quote_matching() -> None:
+    policy = RetrievedPolicy(
+        id="policy-1",
+        name="retention",
+        version=2,
+        content="Customer records must be\nretained for seven years.",
+        score=1,
+    )
+    supported = ModelAnalysis(
+        outcome=AnalysisOutcome.COMPLIANT,
+        confidence=0.92,
+        rationale="The citation preserves the source wording.",
+        citations=[
+            Citation(
+                policy_id=policy.id,
+                policy_version=policy.version,
+                quote="Customer records must be retained for seven years.",
+            )
+        ],
+    )
+    changed_case = ModelAnalysis(
+        outcome=AnalysisOutcome.COMPLIANT,
+        confidence=0.92,
+        rationale="The citation changes more than whitespace.",
+        citations=[
+            Citation(
+                policy_id=policy.id,
+                policy_version=policy.version,
+                quote="customer records must be retained for seven years.",
+            )
+        ],
+    )
+
+    assert validate_analysis(supported, [policy], confidence_threshold=0.7) == []
+    assert validate_analysis(changed_case, [policy], confidence_threshold=0.7) == [
+        "citation_quote_not_found:policy-1:2"
+    ]
+
+
+def test_validation_requires_temporal_claims_in_cited_passages() -> None:
+    policy = RetrievedPolicy(
+        id="policy-1",
+        name="reporting",
+        version=1,
+        content=(
+            "Reports must be submitted within 30 days after notice. "
+            "The rule takes effect on 2026-01-01."
+        ),
+        score=1,
+    )
+    citation = Citation(
+        policy_id=policy.id,
+        policy_version=policy.version,
+        quote=policy.content,
+    )
+    supported = ModelAnalysis(
+        outcome=AnalysisOutcome.COMPLIANT,
+        confidence=0.92,
+        rationale="Reports are due within 30 days and the rule applies on 2026-01-01.",
+        citations=[citation],
+    )
+    unsupported = ModelAnalysis(
+        outcome=AnalysisOutcome.COMPLIANT,
+        confidence=0.92,
+        rationale="Reports are due within 15 days and the rule applies on 2027-01-01.",
+        citations=[citation],
+    )
+
+    assert validate_analysis(supported, [policy], confidence_threshold=0.7) == []
+    assert validate_analysis(unsupported, [policy], confidence_threshold=0.7) == [
+        "rationale_temporal_claim_not_cited:within 15 days",
+        "rationale_temporal_claim_not_cited:on 2027-01-01",
+    ]

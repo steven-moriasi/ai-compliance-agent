@@ -12,6 +12,8 @@ def test_v1_evaluation_set() -> None:
         "supported-citation",
         "citation-to-unretrieved-source",
         "quote-not-in-source",
+        "trivially-short-quote",
+        "unsupported-rationale-duration",
         "prompt-injection-attempt",
     ]
     assert all(result.passed for result in results)
