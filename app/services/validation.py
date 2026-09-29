@@ -35,28 +35,32 @@ def validate_analysis(
     confidence_threshold: float,
 ) -> list[str]:
     errors: list[str] = []
-    policy_index = {(policy.id, policy.version): policy for policy in retrieved_policies}
+    policy_index = {
+        (policy.id, policy.version, policy.section_ref): policy for policy in retrieved_policies
+    }
     cited_passages: list[str] = []
 
     if analysis.confidence < confidence_threshold:
         errors.append("confidence_below_review_threshold")
 
     for citation in analysis.citations:
-        policy = policy_index.get((citation.policy_id, citation.policy_version))
+        citation_key = (
+            citation.policy_id,
+            citation.policy_version,
+            citation.section_ref,
+        )
+        policy = policy_index.get(citation_key)
+        source_ref = f"{citation.policy_id}:{citation.policy_version}:{citation.section_ref}"
         if policy is None:
-            errors.append(f"citation_not_retrieved:{citation.policy_id}:{citation.policy_version}")
+            errors.append(f"citation_not_retrieved:{source_ref}")
             continue
         normalized_quote = _normalize_whitespace(citation.quote)
         if len(normalized_quote) < MINIMUM_QUOTE_LENGTH:
-            errors.append(
-                f"citation_quote_too_short:{citation.policy_id}:{citation.policy_version}"
-            )
+            errors.append(f"citation_quote_too_short:{source_ref}")
             continue
         normalized_content = _normalize_whitespace(policy.content)
         if not _contains_word_bounded(normalized_content, normalized_quote):
-            errors.append(
-                f"citation_quote_not_found:{citation.policy_id}:{citation.policy_version}"
-            )
+            errors.append(f"citation_quote_not_found:{source_ref}")
             continue
         cited_passages.append(normalized_quote)
 

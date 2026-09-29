@@ -69,7 +69,10 @@ def test_openai_compatible_provider_requests_strict_structured_output() -> None:
         id="policy-1",
         name="retention",
         version=2,
+        section_ref="7",
+        heading="Retention",
         content="Customer records must be retained for seven years.",
+        position=0,
         score=1,
     )
 
@@ -78,7 +81,8 @@ def test_openai_compatible_provider_requests_strict_structured_output() -> None:
         assert payload["response_format"]["json_schema"]["strict"] is True
         user_request = json.loads(payload["messages"][1]["content"])
         assert "untrusted_document" in user_request
-        assert user_request["validation_feedback"] == ["citation_quote_not_found:policy-1:2"]
+        assert user_request["validation_feedback"] == ["citation_quote_not_found:policy-1:2:7"]
+        assert user_request["policy_context"][0]["section_ref"] == "7"
         return httpx.Response(
             200,
             json={
@@ -94,6 +98,7 @@ def test_openai_compatible_provider_requests_strict_structured_output() -> None:
                                         {
                                             "policy_id": "policy-1",
                                             "policy_version": 2,
+                                            "section_ref": "7",
                                             "quote": policy.content,
                                         }
                                     ],
@@ -118,7 +123,7 @@ def test_openai_compatible_provider_requests_strict_structured_output() -> None:
                 system_prompt="Return a grounded structured compliance assessment.",
                 document="This procedure retains customer records for seven years.",
                 policies=[policy],
-                validation_feedback=("citation_quote_not_found:policy-1:2",),
+                validation_feedback=("citation_quote_not_found:policy-1:2:7",),
             )
         )
 
@@ -132,7 +137,10 @@ def test_openai_compatible_provider_classifies_malformed_structured_output() -> 
         id="policy-1",
         name="retention",
         version=2,
+        section_ref="7",
+        heading="Retention",
         content="Customer records must be retained for seven years.",
+        position=0,
         score=1,
     )
 
@@ -167,7 +175,10 @@ def test_validation_rejects_unretrieved_and_unsupported_citations() -> None:
         id="policy-1",
         name="retention",
         version=2,
+        section_ref="7",
+        heading="Retention",
         content="Customer records must be retained for seven years.",
+        position=0,
         score=1,
     )
     analysis = ModelAnalysis(
@@ -178,11 +189,13 @@ def test_validation_rejects_unretrieved_and_unsupported_citations() -> None:
             Citation(
                 policy_id=policy.id,
                 policy_version=policy.version,
+                section_ref=policy.section_ref,
                 quote="Customer records may be deleted immediately.",
             ),
             Citation(
                 policy_id="policy-not-retrieved",
                 policy_version=1,
+                section_ref="document",
                 quote="An unrelated requirement.",
             ),
         ],
@@ -191,9 +204,51 @@ def test_validation_rejects_unretrieved_and_unsupported_citations() -> None:
     errors = validate_analysis(analysis, [policy], confidence_threshold=0.7)
 
     assert errors == [
-        "citation_quote_not_found:policy-1:2",
-        "citation_not_retrieved:policy-not-retrieved:1",
+        "citation_quote_not_found:policy-1:2:7",
+        "citation_not_retrieved:policy-not-retrieved:1:document",
     ]
+
+
+def test_validation_requires_quote_to_appear_in_cited_section() -> None:
+    reporting = RetrievedPolicy(
+        id="policy-1",
+        name="incident-reporting",
+        version=2,
+        section_ref="7",
+        heading="Reporting",
+        content="Reports must be submitted within 30 days.",
+        position=0,
+        score=1,
+    )
+    retention = RetrievedPolicy(
+        id="policy-1",
+        name="incident-reporting",
+        version=2,
+        section_ref="8",
+        heading="Retention",
+        content="Reports must be retained for seven years.",
+        position=1,
+        score=0.5,
+    )
+    analysis = ModelAnalysis(
+        outcome=AnalysisOutcome.COMPLIANT,
+        confidence=0.92,
+        rationale="The citation must resolve to its exact section.",
+        citations=[
+            Citation(
+                policy_id=reporting.id,
+                policy_version=reporting.version,
+                section_ref=retention.section_ref,
+                quote=reporting.content,
+            )
+        ],
+    )
+
+    assert validate_analysis(
+        analysis,
+        [reporting, retention],
+        confidence_threshold=0.7,
+    ) == ["citation_quote_not_found:policy-1:2:8"]
 
 
 def test_validation_requires_meaningful_word_bounded_quotes() -> None:
@@ -201,7 +256,10 @@ def test_validation_requires_meaningful_word_bounded_quotes() -> None:
         id="policy-1",
         name="retention",
         version=2,
+        section_ref="7",
+        heading="Retention",
         content="Customer records must be retained for seven years.",
+        position=0,
         score=1,
     )
     analysis = ModelAnalysis(
@@ -212,11 +270,13 @@ def test_validation_requires_meaningful_word_bounded_quotes() -> None:
             Citation(
                 policy_id=policy.id,
                 policy_version=policy.version,
+                section_ref=policy.section_ref,
                 quote="Customer",
             ),
             Citation(
                 policy_id=policy.id,
                 policy_version=policy.version,
+                section_ref=policy.section_ref,
                 quote="ustomer records must be retained",
             ),
         ],
@@ -225,8 +285,8 @@ def test_validation_requires_meaningful_word_bounded_quotes() -> None:
     errors = validate_analysis(analysis, [policy], confidence_threshold=0.7)
 
     assert errors == [
-        "citation_quote_too_short:policy-1:2",
-        "citation_quote_not_found:policy-1:2",
+        "citation_quote_too_short:policy-1:2:7",
+        "citation_quote_not_found:policy-1:2:7",
     ]
 
 
@@ -235,7 +295,10 @@ def test_validation_normalizes_only_whitespace_for_quote_matching() -> None:
         id="policy-1",
         name="retention",
         version=2,
+        section_ref="7",
+        heading="Retention",
         content="Customer records must be\nretained for seven years.",
+        position=0,
         score=1,
     )
     supported = ModelAnalysis(
@@ -246,6 +309,7 @@ def test_validation_normalizes_only_whitespace_for_quote_matching() -> None:
             Citation(
                 policy_id=policy.id,
                 policy_version=policy.version,
+                section_ref=policy.section_ref,
                 quote="Customer records must be retained for seven years.",
             )
         ],
@@ -258,6 +322,7 @@ def test_validation_normalizes_only_whitespace_for_quote_matching() -> None:
             Citation(
                 policy_id=policy.id,
                 policy_version=policy.version,
+                section_ref=policy.section_ref,
                 quote="customer records must be retained for seven years.",
             )
         ],
@@ -265,7 +330,7 @@ def test_validation_normalizes_only_whitespace_for_quote_matching() -> None:
 
     assert validate_analysis(supported, [policy], confidence_threshold=0.7) == []
     assert validate_analysis(changed_case, [policy], confidence_threshold=0.7) == [
-        "citation_quote_not_found:policy-1:2"
+        "citation_quote_not_found:policy-1:2:7"
     ]
 
 
@@ -274,15 +339,19 @@ def test_validation_requires_temporal_claims_in_cited_passages() -> None:
         id="policy-1",
         name="reporting",
         version=1,
+        section_ref="4",
+        heading="Reporting",
         content=(
             "Reports must be submitted within 30 days after notice. "
             "The rule takes effect on 2026-01-01."
         ),
+        position=0,
         score=1,
     )
     citation = Citation(
         policy_id=policy.id,
         policy_version=policy.version,
+        section_ref=policy.section_ref,
         quote=policy.content,
     )
     supported = ModelAnalysis(

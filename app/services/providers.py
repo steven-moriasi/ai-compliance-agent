@@ -54,7 +54,14 @@ class DeterministicProvider:
             rationale=(
                 "A human must confirm how the cited policy applies to the submitted document."
             ),
-            citations=[Citation(policy_id=policy.id, policy_version=policy.version, quote=quote)],
+            citations=[
+                Citation(
+                    policy_id=policy.id,
+                    policy_version=policy.version,
+                    section_ref=policy.section_ref,
+                    quote=quote,
+                )
+            ],
         )
         return ModelResponse(
             analysis=analysis,
@@ -113,6 +120,8 @@ class OpenAICompatibleProvider:
                 "policy_id": policy.id,
                 "name": policy.name,
                 "version": policy.version,
+                "section_ref": policy.section_ref,
+                "heading": policy.heading,
                 "content": policy.content,
             }
             for policy in request.policies

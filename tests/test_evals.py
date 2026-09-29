@@ -18,5 +18,7 @@ def test_v1_evaluation_set() -> None:
         "malformed-model-output",
         "prompt-injection-attempt",
         "no-relevant-source",
+        "effective-section-ranking",
+        "quote-from-other-section",
     ]
     assert all(result.passed for result in results)

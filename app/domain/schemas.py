@@ -114,6 +114,7 @@ class Citation(BaseModel):
 
     policy_id: str
     policy_version: int
+    section_ref: str = Field(min_length=1, max_length=120)
     quote: str = Field(min_length=1, max_length=1000)
 
 

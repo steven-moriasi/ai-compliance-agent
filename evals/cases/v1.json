@@ -21,14 +21,15 @@
             {
               "policy_id": "policy-retention",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Customer records must be retained for seven years."
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-retention"
+        "retrieved_sources": [
+          "policy-retention:1:document"
         ],
         "validation_errors": [],
         "injection_signals": [],
@@ -67,6 +68,7 @@
             {
               "policy_id": "policy-passwords",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Passwords require twelve symbols and quarterly rotation."
             }
           ]
@@ -79,17 +81,18 @@
             {
               "policy_id": "policy-passwords",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Passwords require twelve symbols and quarterly rotation."
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-retention"
+        "retrieved_sources": [
+          "policy-retention:1:document"
         ],
         "validation_errors": [
-          "citation_not_retrieved:policy-passwords:1"
+          "citation_not_retrieved:policy-passwords:1:document"
         ],
         "injection_signals": [],
         "status": "review_required",
@@ -122,6 +125,7 @@
             {
               "policy_id": "policy-retention",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Customer records may be deleted immediately."
             }
           ]
@@ -134,17 +138,18 @@
             {
               "policy_id": "policy-retention",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Customer records may be deleted immediately."
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-retention"
+        "retrieved_sources": [
+          "policy-retention:1:document"
         ],
         "validation_errors": [
-          "citation_quote_not_found:policy-retention:1"
+          "citation_quote_not_found:policy-retention:1:document"
         ],
         "injection_signals": [],
         "status": "review_required",
@@ -177,6 +182,7 @@
             {
               "policy_id": "policy-retention",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Customer"
             }
           ]
@@ -189,17 +195,18 @@
             {
               "policy_id": "policy-retention",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Customer"
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-retention"
+        "retrieved_sources": [
+          "policy-retention:1:document"
         ],
         "validation_errors": [
-          "citation_quote_too_short:policy-retention:1"
+          "citation_quote_too_short:policy-retention:1:document"
         ],
         "injection_signals": [],
         "status": "review_required",
@@ -232,6 +239,7 @@
             {
               "policy_id": "policy-reporting",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Reports must be submitted within 30 days after notice."
             }
           ]
@@ -244,14 +252,15 @@
             {
               "policy_id": "policy-reporting",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Reports must be submitted within 30 days after notice."
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-reporting"
+        "retrieved_sources": [
+          "policy-reporting:1:document"
         ],
         "validation_errors": [
           "rationale_temporal_claim_not_cited:within 15 days"
@@ -293,15 +302,16 @@
             {
               "policy_id": "policy-reporting",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Reports must be submitted within 30 days after notice."
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-reporting",
-          "policy-notice"
+        "retrieved_sources": [
+          "policy-reporting:1:document",
+          "policy-notice:1:document"
         ],
         "validation_errors": [],
         "injection_signals": [],
@@ -339,8 +349,8 @@
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-retention"
+        "retrieved_sources": [
+          "policy-retention:1:document"
         ],
         "validation_errors": [
           "malformed_model_output"
@@ -376,14 +386,15 @@
             {
               "policy_id": "policy-retention",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Customer records must be retained for seven years."
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [
-          "policy-retention"
+        "retrieved_sources": [
+          "policy-retention:1:document"
         ],
         "validation_errors": [
           "prompt_injection_signal_requires_review"
@@ -421,13 +432,14 @@
             {
               "policy_id": "policy-retention",
               "policy_version": 1,
+              "section_ref": "document",
               "quote": "Customer records must be retained for seven years."
             }
           ]
         }
       ],
       "expected": {
-        "retrieved_policy_ids": [],
+        "retrieved_sources": [],
         "validation_errors": [
           "no_relevant_source"
         ],
@@ -436,6 +448,168 @@
         "error_code": "no_relevant_source",
         "provider_attempts": 0,
         "audit_events": [
+          "analysis_completed"
+        ]
+      }
+    },
+    {
+      "id": "effective-section-ranking",
+      "document": "Reports must be submitted within 30 days.",
+      "case_date": "2026-06-01",
+      "policies": [
+        {
+          "id": "policy-reporting-v1",
+          "name": "incident-reporting",
+          "version": 1,
+          "content": "Earlier incident reporting rule.",
+          "effective_to": "2026-01-01",
+          "sections": [
+            {
+              "section_ref": "4",
+              "heading": "Reporting",
+              "text": "Reports must be submitted within 10 days.",
+              "position": 0
+            }
+          ]
+        },
+        {
+          "id": "policy-reporting-v2",
+          "name": "incident-reporting",
+          "version": 2,
+          "content": "Current incident reporting rule.",
+          "effective_from": "2026-01-01",
+          "effective_to": "2027-01-01",
+          "sections": [
+            {
+              "section_ref": "1",
+              "heading": "Scope",
+              "text": "This regulation applies to regulated organizations.",
+              "position": 0
+            },
+            {
+              "section_ref": "7",
+              "heading": "Reporting",
+              "text": "Reports must be submitted within 30 days.",
+              "position": 1
+            }
+          ]
+        },
+        {
+          "id": "policy-reporting-v3",
+          "name": "incident-reporting",
+          "version": 3,
+          "content": "Future incident reporting rule.",
+          "effective_from": "2027-01-01",
+          "sections": [
+            {
+              "section_ref": "8",
+              "heading": "Reporting",
+              "text": "Reports must be submitted within 60 days.",
+              "position": 0
+            }
+          ]
+        }
+      ],
+      "provider_outputs": [
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "Reports are submitted within 30 days.",
+          "citations": [
+            {
+              "policy_id": "policy-reporting-v2",
+              "policy_version": 2,
+              "section_ref": "7",
+              "quote": "Reports must be submitted within 30 days."
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "retrieved_sources": [
+          "policy-reporting-v2:2:7"
+        ],
+        "validation_errors": [],
+        "injection_signals": [],
+        "status": "review_required",
+        "error_code": null,
+        "provider_attempts": 1,
+        "audit_events": [
+          "analysis_attempted",
+          "analysis_completed"
+        ]
+      }
+    },
+    {
+      "id": "quote-from-other-section",
+      "document": "Reports must be submitted within 30 days and retained for seven years.",
+      "case_date": "2026-06-01",
+      "policies": [
+        {
+          "id": "policy-reporting",
+          "name": "incident-reporting",
+          "version": 2,
+          "content": "Incident reporting and retention requirements.",
+          "effective_from": "2026-01-01",
+          "sections": [
+            {
+              "section_ref": "7",
+              "heading": "Reporting",
+              "text": "Reports must be submitted within 30 days.",
+              "position": 0
+            },
+            {
+              "section_ref": "8",
+              "heading": "Retention",
+              "text": "Reports must be retained for seven years.",
+              "position": 1
+            }
+          ]
+        }
+      ],
+      "provider_outputs": [
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The cited section contains the reporting deadline.",
+          "citations": [
+            {
+              "policy_id": "policy-reporting",
+              "policy_version": 2,
+              "section_ref": "8",
+              "quote": "Reports must be submitted within 30 days."
+            }
+          ]
+        },
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The cited section contains the reporting deadline.",
+          "citations": [
+            {
+              "policy_id": "policy-reporting",
+              "policy_version": 2,
+              "section_ref": "8",
+              "quote": "Reports must be submitted within 30 days."
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "retrieved_sources": [
+          "policy-reporting:2:8",
+          "policy-reporting:2:7"
+        ],
+        "validation_errors": [
+          "citation_quote_not_found:policy-reporting:2:8"
+        ],
+        "injection_signals": [],
+        "status": "review_required",
+        "error_code": null,
+        "provider_attempts": 2,
+        "audit_events": [
+          "analysis_attempted",
+          "analysis_attempted",
           "analysis_completed"
         ]
       }

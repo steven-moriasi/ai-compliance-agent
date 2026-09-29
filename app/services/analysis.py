@@ -47,7 +47,11 @@ class AnalysisService:
         correlation_id: str,
         worker_id: str,
     ) -> ComplianceCase:
-        policies = retrieve_policies(self.session, case.document.content)
+        policies = retrieve_policies(
+            self.session,
+            case.document.content,
+            case.created_at.date(),
+        )
         injection_signals = detect_prompt_injection(case.document.content)
         if not policies:
             validation_errors = ["no_relevant_source"]

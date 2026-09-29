@@ -81,6 +81,7 @@ class FixingProvider:
                     Citation(
                         policy_id=policy.id,
                         policy_version=policy.version,
+                        section_ref=policy.section_ref,
                         quote=quote,
                     )
                 ],
@@ -156,6 +157,7 @@ def test_human_reviewed_analysis_flow(
     assert result.json()["outcome"] == "needs_review"
     assert result.json()["validation_errors"] == ["confidence_below_review_threshold"]
     assert result.json()["citations"][0]["policy_id"]
+    assert result.json()["citations"][0]["section_ref"] == "document"
 
     review = client.post(
         f"/api/v1/cases/{case_id}/reviews",
@@ -300,7 +302,7 @@ def test_analysis_retries_fixable_output_with_validation_feedback(
     assert len(provider.requests) == 2
     assert provider.requests[0].validation_feedback == ()
     assert provider.requests[1].validation_feedback == (
-        f"citation_quote_not_found:{provider.requests[0].policies[0].id}:1",
+        (f"citation_quote_not_found:{provider.requests[0].policies[0].id}:1:document"),
     )
     assert [event.details["result"] for event in attempt_events] == [
         "validation_failed",
