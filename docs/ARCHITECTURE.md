@@ -40,20 +40,31 @@ flowchart LR
 flowchart TD
     Ingest[Ingest and hash document] --> Queue[Create idempotent queued case]
     Queue --> Claim[Worker claims lease]
-    Claim --> Retrieve[Retrieve active policy versions]
+    Claim --> Retrieve[Retrieve effective policy sections]
     Retrieve --> Prompt[Build versioned prompt context]
     Prompt --> Model[Request strict structured output]
     Model --> Schema[Validate output schema]
-    Schema --> Citations[Validate citations against retrieved text]
+    Schema --> Citations[Validate citations against cited section]
     Citations --> Signals[Apply confidence and injection controls]
     Signals --> Review[Require human review]
     Review --> Decision[Persist immutable review and analysis hash]
     Decision --> Outbox[Enqueue notification in same transaction]
 ```
 
-The retrieval implementation is deliberately deterministic and inspectable: lexical overlap ranks
-only active policy versions. It is suitable as a reference boundary, not as a claim of semantic
-retrieval quality.
+The retrieval implementation is deliberately deterministic and inspectable. It filters active
+policy versions to half-open effective windows (`effective_from <= case_date < effective_to`) and
+ranks their sections by lexical overlap. Missing bounds are open, and policies without explicit
+sections use a `document` fallback section. The current case date is the case creation date.
+
+Each citation identifies a policy ID, policy version, and section reference. Deterministic
+validation resolves that exact source and requires the normalized quote to occur within that
+section. Quote presence establishes source traceability, not correct interpretation. Lexical
+ranking is suitable as a reference boundary, not as a claim of semantic retrieval quality.
+
+Malformed structured output and model-fixable citation findings receive at most one retry with
+validation feedback. Provider failures are not retried inside the analysis attempt, and missing
+relevant sources do not invoke the provider. Confidence and injection findings remain human-review
+signals rather than retry triggers.
 
 ## Durable processing
 
@@ -71,6 +82,7 @@ pattern, then backs off failed attempts before moving exhausted records to `DEAD
 | Record | Purpose | Mutability |
 | --- | --- | --- |
 | Policy | versioned source material and content hash | new versions preferred over replacement |
+| Policy section | ordered citation source within an effective-dated policy version | replaced through a new policy version |
 | Prompt template | model instruction and output schema version | versioned; one active version per name |
 | Document | source text and content hash | immutable by API |
 | Compliance case | workflow and model result | state-machine updates |
@@ -110,6 +122,11 @@ managed signing secret and an external endpoint.
 
 - No legal or regulatory conclusion is automated; every successful analysis requires review.
 - Lexical retrieval is transparent but does not provide embedding-based recall.
+- Effective-date filtering uses case creation time and does not model jurisdiction, entity type,
+  transitional provisions, or a separately supplied applicability date.
+- Policy text and sections are manually entered; publication authenticity and provenance are not
+  verified, and section text is not checked against an immutable published artifact.
+- Exact section quotes establish traceability but not legal interpretation.
 - Document content is stored in PostgreSQL for clarity; a production deployment may use encrypted
   object storage with retention controls.
 - OIDC roles are accepted from configured claims; production deployments must align them with the

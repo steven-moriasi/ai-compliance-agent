@@ -47,8 +47,9 @@ The notifier exits immediately unless both webhook settings are present.
 ## Verification
 
 ```bash
-ruff check app tests alembic
-mypy app
+ruff check app tests evals alembic
+mypy app evals
+python -m evals.run evals/cases/v1.json
 pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 docker build -t ai-compliance-agent:local .
 docker compose config --quiet
@@ -64,6 +65,24 @@ alembic upgrade head
 
 Never run a downgrade against production merely as a health check. Validate backups and the exact
 release procedure before a production schema change.
+
+Run concurrency evidence only against a disposable PostgreSQL database:
+
+```bash
+COMPLIANCE_TEST_DATABASE_URL=postgresql+psycopg://compliance:compliance@localhost:5432/compliance \
+pytest -m postgres tests/test_postgres_concurrency.py
+```
+
+The test fixture creates and removes an isolated schema. It verifies competing `SKIP LOCKED`
+claims, stale analysis fencing after a reap, and notification reclaim. It skips when the test
+database URL is absent.
+
+Run the deterministic corpus after changing retrieval, provider output, citation validation, retry
+behavior, or failure handling:
+
+```bash
+python -m evals.run evals/cases/v1.json
+```
 
 ## Health and telemetry
 

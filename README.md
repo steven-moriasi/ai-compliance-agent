@@ -17,13 +17,14 @@ replace compliance professionals, claim regulatory certification, or reproduce a
 
 The model has no authority to mutate policies or finalize decisions. Every completed analysis:
 
-1. uses a versioned prompt and active policy versions;
-2. returns a strict typed result with source citations;
-3. passes deterministic citation and confidence checks;
-4. records prompt-injection signals;
-5. transitions to mandatory human review;
-6. becomes approved or rejected only by an authorized reviewer;
-7. binds the review to a hash of the exact analysis snapshot.
+1. uses a versioned prompt and policy catalog;
+2. retrieves policy sections whose effective window contains the case date;
+3. returns a strict typed result with section-qualified source citations;
+4. passes deterministic citation and confidence checks;
+5. records prompt-injection signals;
+6. transitions to mandatory human review;
+7. becomes approved or rejected only by an authorized reviewer;
+8. binds the review to a hash of the exact analysis snapshot.
 
 ## Engineering evidence
 
@@ -31,10 +32,11 @@ The model has no authority to mutate policies or finalize decisions. Every compl
 | --- | --- |
 | Reproducibility | deterministic local provider, pinned direct dependencies, Docker and Compose |
 | Structured AI | strict JSON-schema request and Pydantic response validation |
-| Grounding | deterministic retrieval of active policy versions and exact-quote validation |
+| Grounding | effective-dated section retrieval and exact-quote validation within the cited section |
 | Hallucination mitigation | retrieved-source checks, confidence finding, mandatory review |
+| Regression evidence | versioned deterministic corpus for retrieval, citations, retries, and failures |
 | Prompt injection | untrusted-document envelope, signal detection, no model-controlled actions |
-| Durable execution | PostgreSQL queue, worker leases, attempts, reaper, fencing tokens |
+| Durable execution | PostgreSQL queue, worker leases, reaper, fencing tokens, concurrency tests |
 | Idempotency | database-enforced case key and webhook delivery ID |
 | Human accountability | reviewer RBAC, rationale, analysis hash, unique immutable review |
 | Side effects | transactional outbox, HMAC-signed webhook, retries, dead-letter state |
@@ -77,6 +79,11 @@ threat model, failure model, operational runbook, architecture decisions, and ro
 - The repository does not establish production scale, availability, recovery, or incident outcomes.
 - It does not establish legal or regulatory correctness, certification, or formal assurance.
 - It does not establish model quality, fairness, or semantic retrieval quality.
+- Exact quote presence does not prove that a model or reviewer interpreted the source correctly.
+- Policy sources are entered manually; source authenticity and publication provenance are not
+  verified.
+- The case date is currently the case creation date, not a separately supplied legal or business
+  applicability date.
 - It makes no claim about client history, cost savings, adoption, or business outcomes.
 
 ## Quick start
@@ -109,7 +116,7 @@ docker compose down
 
 ## Local development
 
-Supported Python versions are 3.11 through 3.13; CI uses Python 3.12.
+Supported Python versions are 3.11 through 3.14; CI uses Python 3.12.
 
 ```bash
 python -m pip install -e '.[dev]'
@@ -171,7 +178,7 @@ The remote adapter sends:
 
 - a versioned system prompt;
 - an explicitly labeled untrusted document;
-- retrieved policy IDs, names, versions, and content;
+- retrieved policy IDs, names, versions, section references, headings, and section text;
 - the generated strict JSON schema for `ModelAnalysis`.
 
 Configure the provider only through environment or managed deployment secrets. Provider errors are
@@ -209,15 +216,49 @@ All variables use the `COMPLIANCE_` prefix.
 ## Quality gates
 
 ```bash
-ruff check app tests alembic
-mypy app
+ruff check app tests evals alembic
+mypy app evals
+python -m evals.run evals/cases/v1.json
 pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 docker build -t ai-compliance-agent:local .
 docker compose config --quiet
 ```
 
-CI also verifies a PostgreSQL migration upgrade/downgrade/upgrade cycle. Tests never require a real
-model API key.
+### Verification checks
+
+| Check | What it verifies | What it does not prove |
+| --- | --- | --- |
+| Ruff and mypy | source quality rules and strict application/evaluation typing | runtime behavior |
+| Deterministic evaluations | expected retrieval, citation, retry, injection, and failure outcomes | legal correctness or live-model quality |
+| Pytest and coverage | API, workflow, provider, validation, recovery, and authorization behavior | production scale or availability |
+| PostgreSQL concurrency tests | `SKIP LOCKED` claims, stale-token fencing, and notification reclaim | throughput under sustained load |
+| Alembic round trip | upgrade, downgrade, and re-upgrade execute on PostgreSQL | zero-downtime release compatibility |
+| Container and Compose checks | the image builds and local topology is structurally valid | a production deployment |
+
+CI runs the PostgreSQL concurrency tests after the migration round trip. The standard test suite
+skips those tests unless `COMPLIANCE_TEST_DATABASE_URL` points to a disposable PostgreSQL database.
+No verification command requires a real model API key.
+
+### Deterministic evaluation corpus
+
+Run the versioned corpus directly:
+
+```bash
+python -m evals.run evals/cases/v1.json
+pytest tests/test_evals.py
+```
+
+Each case declares a case date, policy versions and sections, deterministic provider outputs, and
+expected retrieved sources, validation findings, workflow status, provider attempts, and audit
+events. Add a sanitized case whenever retrieval, validation, retry, or failure behavior changes.
+The corpus uses SQLite and local fixtures; it makes no network calls.
+
+Run the PostgreSQL-only evidence against a disposable database:
+
+```bash
+COMPLIANCE_TEST_DATABASE_URL=postgresql+psycopg://compliance:compliance@localhost:5432/compliance \
+pytest -m postgres tests/test_postgres_concurrency.py
+```
 
 ## Repository structure
 
@@ -228,8 +269,9 @@ app/domain/          persistence models, enums, and API/model schemas
 app/infrastructure/  database sessions and authentication
 app/services/        retrieval, providers, validation, workflow, audit, outbox
 alembic/              versioned database migrations
-tests/                deterministic workflow, security, provider, and recovery tests
-docs/                 architecture, security, operations, decisions, and review
+evals/                 versioned deterministic verification cases and runner
+tests/                 workflow, security, provider, recovery, and PostgreSQL concurrency tests
+docs/                  architecture, security, operations, decisions, and roadmap
 ```
 
 ## License

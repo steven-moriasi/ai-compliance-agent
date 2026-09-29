@@ -42,7 +42,7 @@ shipped, not controls supplied by a future cloud platform.
 | Spoofing | forged API identity | RS256 signature, issuer, audience, and JWKS validation | enforce TLS, key rotation, short token lifetime, and IdP conditional access |
 | Spoofing | forged notification | HMAC-SHA256 over canonical body | rotate signing keys and use constant-time verification at consumer |
 | Tampering | document changed after analysis | content hash stored at ingestion | protect database and verify hash when exporting evidence |
-| Tampering | model cites unrelated policy | citation must reference retrieved policy/version and exact quote | retrieval quality can omit relevant policies; evaluate recall |
+| Tampering | model cites an unrelated section | citation must reference retrieved policy/version/section and quote text from that section | quote presence does not prove correct interpretation; evaluate retrieval recall |
 | Tampering | stale worker overwrites recovery | lease, worker identity, and monotonically increasing fencing token | database time should replace application time across regions |
 | Repudiation | reviewer denies decision | actor ID, rationale, analysis hash, timestamp, and audit event | use append-only/WORM export and signed audit batches |
 | Information disclosure | provider exception leaks secrets | stable public error code and redacted message | add centralized log redaction and provider data-retention agreement |
@@ -60,7 +60,8 @@ Document text is always considered data, not instruction. The provider request:
 2. serializes the document under an `untrusted_document` field;
 3. supplies a bounded retrieved policy context;
 4. requests a strict JSON schema;
-5. validates every citation against the retrieved policy version and exact source text;
+5. validates every citation against the retrieved policy version, section reference, and exact
+   section text;
 6. records known injection signals as validation findings;
 7. sends every completed result to a human reviewer.
 
@@ -117,4 +118,5 @@ The reference application intentionally does not claim compliance with a named r
 - Add webhook replay-window semantics in addition to idempotency.
 - Export audit events to immutable storage.
 - Add software bill of materials, image scanning, and signed provenance in release CI.
-- Evaluate model and retrieval behavior using a curated adversarial corpus.
+- Expand the adversarial corpus with sourced ambiguity, conflicting effective versions, and
+  jurisdiction/applicability cases.

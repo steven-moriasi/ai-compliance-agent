@@ -3,18 +3,35 @@
 The repository is a reference implementation, not a production compliance product. Roadmap items
 are ordered by risk reduction rather than feature volume.
 
+## Current production gaps
+
+- Policy sections are manually entered; there is no authenticated publication ingest, source
+  signature, immutable source artifact, provenance chain, or section-to-source consistency check.
+- The case date is derived from creation time. There is no explicit applicability date,
+  jurisdiction, regulated-entity profile, or transitional-rule model.
+- Effective windows are filtered but overlapping active versions and conflicting sections are not
+  rejected automatically.
+- Lexical ranking and exact-quote checks establish reproducible traceability, not semantic recall,
+  legal interpretation, or regulatory correctness.
+- The deterministic corpus proves application behavior against synthetic fixtures; it is not a
+  legal-expert benchmark and does not measure live-provider quality.
+- PostgreSQL concurrency tests cover claiming, fencing, and notification reclaim, but not sustained
+  throughput, failover, or multi-region clock behavior.
+- Human review has an API boundary but no assignment, escalation, workload, or separation-of-duties
+  workflow.
+
 ## Near term: evaluation and evidence
 
-- Build a versioned adversarial evaluation corpus covering unsupported citations, irrelevant
-  retrieval, injection attempts, malformed provider output, and ambiguous policy text.
-- Add measurable retrieval and analysis evaluation criteria without representing model confidence
-  as ground truth.
+- Add measurable retrieval recall and analysis criteria using reviewed source fixtures without
+  representing model confidence as ground truth.
+- Add conflicting-version, ambiguous-section, jurisdiction, and applicability-date cases to the
+  versioned corpus.
 - Exercise OIDC validation against a disposable JWKS server, including rotation, expiry, issuer,
   audience, and role-claim failures.
-- Add PostgreSQL concurrency tests for competing workers, lease expiry, concurrent review, and
-  notification reclaim.
-- Add integration tests that prove review and outbox atomicity during injected failures.
+- Add PostgreSQL tests for concurrent review and review/outbox atomicity during injected failures.
 - Define a prompt promotion process with evaluation results and rollback criteria.
+- Define source-ingestion provenance, authenticity checks, and approval before a policy version
+  becomes active.
 
 ## Next: operational maturity
 

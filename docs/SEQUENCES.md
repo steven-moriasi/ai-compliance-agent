@@ -22,11 +22,15 @@ sequenceDiagram
 
     Worker->>DB: Claim oldest queued case
     DB-->>Worker: Lease + incremented fencing token
-    Worker->>DB: Load active policy versions and prompt
-    Worker->>Worker: Rank policies and detect injection signals
-    Worker->>Model: Prompt + untrusted document + retrieved policies + JSON schema
+    Worker->>DB: Load prompt + policy sections effective on case date
+    Worker->>Worker: Rank sections and detect injection signals
+    Worker->>Model: Prompt + untrusted document + retrieved sections + JSON schema
     Model-->>Worker: Structured analysis, citations, usage
-    Worker->>Worker: Validate schema, confidence, and citation quotes
+    Worker->>Worker: Validate schema, confidence, and exact-section quotes
+    opt Malformed or fixable citation output on first attempt
+        Worker->>Model: Retry once with validation feedback
+        Model-->>Worker: Corrected structured analysis
+    end
     Worker->>DB: Conditional result update under lease
     Worker->>DB: Append analysis_completed audit
 
