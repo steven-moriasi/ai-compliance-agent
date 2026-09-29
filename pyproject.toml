@@ -36,6 +36,9 @@ packages = ["app"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers --disable-warnings"
+markers = [
+    "postgres: tests that require COMPLIANCE_TEST_DATABASE_URL and PostgreSQL",
+]
 
 [tool.ruff]
 line-length = 100
