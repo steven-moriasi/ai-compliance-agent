@@ -1,0 +1,48 @@
+{
+  "recorded_at": "2026-10-06T21:38:07.413222+00:00",
+  "git_sha": "46fc3bd88baa42660354797d21e73b4968ce7ef5",
+  "user_agent": "ai-compliance-agent/0.1 (local-corpus-probe)",
+  "search_url_shape": "GET /api/v1/documents.json with conditions[agencies][], conditions[type][], conditions[cfr][title], conditions[publication_date][gte], conditions[publication_date][lte], per_page, order, fields[]",
+  "query": {
+    "agency": "environmental-protection-agency",
+    "type": "RULE",
+    "cfr_title": 40,
+    "publication_date_gte": "2023-01-01",
+    "publication_date_lte": "2025-12-31",
+    "per_page": 20,
+    "order": "newest"
+  },
+  "count": 995,
+  "total_pages": 50,
+  "results_on_first_page": 20,
+  "next_page_url_present": true,
+  "next_page_url_note": "The first next_page_url pointed at /api/v1/documents rather than /api/v1/documents.json",
+  "result_fields_observed": [
+    "abstract",
+    "agencies",
+    "citation",
+    "document_number",
+    "effective_on",
+    "full_text_xml_url",
+    "html_url",
+    "publication_date",
+    "raw_text_url",
+    "title",
+    "type"
+  ],
+  "full_text_xml_url": "Returned HTTP 200 text/html, 10596 bytes, title Federal Register :: Request Access",
+  "raw_text_url": "Returned the same HTML access page",
+  "browser_user_agent": "Did not change the access page",
+  "govinfo_issue_xml": {
+    "FR-2025-12-19.xml": {
+      "bytes": 3394987,
+      "content_type": "application/xml"
+    },
+    "FR-2024-09-03.xml": {
+      "bytes": 5579395,
+      "subscript_e_t_52_tags": 285,
+      "contains_document": "2024-19699"
+    }
+  },
+  "sample_section_markup": "SECTNO text used a section sign plus U+2009 before the number, for example section 52.1570; subscript markup was E T=52"
+}

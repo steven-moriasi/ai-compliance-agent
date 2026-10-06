@@ -7,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from app.domain.enums import (
     AnalysisOutcome,
     CaseStatus,
+    IngestionStatus,
     NotificationStatus,
     PolicyStatus,
     ReviewDecision,
@@ -28,7 +29,10 @@ class Base(DeclarativeBase):
 
 class Policy(Base):
     __tablename__ = "policies"
-    __table_args__ = (Index("ix_policy_name_version", "name", "version", unique=True),)
+    __table_args__ = (
+        Index("ix_policy_name_version", "name", "version", unique=True),
+        Index("ix_policy_document_number", "document_number"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(160))
@@ -38,8 +42,21 @@ class Policy(Base):
     )
     content: Mapped[str] = mapped_column(Text)
     content_hash: Mapped[str] = mapped_column(String(64))
+    content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    document_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    publication_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    citation: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    cfr_references: Mapped[list[JsonObject] | None] = mapped_column(JSON, nullable=True)
+    docket_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    effective_date_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    dataset_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    correction_of: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_by: Mapped[str] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     sections: Mapped[list["PolicySection"]] = relationship(
@@ -187,3 +204,19 @@ class NotificationOutbox(Base):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(String(240), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class IngestionRun(Base):
+    __tablename__ = "ingestion_runs"
+    __table_args__ = (Index("ix_ingestion_runs_status", "status"),)
+
+    run_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    params: Mapped[JsonObject] = mapped_column(JSON)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    counts: Mapped[JsonObject] = mapped_column(JSON)
+    status: Mapped[IngestionStatus] = mapped_column(
+        Enum(IngestionStatus, native_enum=False), default=IngestionStatus.RUNNING
+    )
+    dataset_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[str | None] = mapped_column(String(240), nullable=True)

@@ -1,0 +1,22 @@
+{
+  "recorded_at": "2026-10-06T21:38:07.413222+00:00",
+  "git_sha": "46fc3bd88baa42660354797d21e73b4968ce7ef5",
+  "command": "Get-CimInstance Win32_Processor, Win32_ComputerSystem, Win32_LogicalDisk; nvidia-smi; py -3 --version; py -3 -m pip install torch --dry-run",
+  "cpu": "Intel(R) Core(TM) i5-1035G1 CPU @ 1.00GHz",
+  "cores": 4,
+  "logical_processors": 8,
+  "ram_gb": 15.6,
+  "os": "Microsoft Windows 11 Pro 10.0.26200",
+  "disk": {
+    "device": "D:",
+    "size_gb": 109.4,
+    "free_gb": 102.7
+  },
+  "gpu": null,
+  "gpu_probe": "nvidia-smi was not installed",
+  "python": "3.14.7",
+  "machine": "AMD64",
+  "torch_wheel": "torch 2.14.1 cp314 win_amd64 is published; dry-run selected it and did not install it",
+  "sentence_transformers": "6.1.0 dependency resolution selected torch 2.14.1 cp314; installation was not completed",
+  "model_size_constraint": "CPU only, so later local models should stay at the small end of the 3B to 8B range"
+}

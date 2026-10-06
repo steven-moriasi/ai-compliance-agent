@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.domain.enums import PolicyStatus
 from app.domain.models import Policy, PolicySection
+from app.ingestion.federal_register.synonyms import expand_tokens
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
 
@@ -24,7 +25,8 @@ class RetrievedPolicy:
 
 
 def _tokens(value: str) -> set[str]:
-    return set(TOKEN_PATTERN.findall(value.lower()))
+    """Token overlap stays lexical. Listed abbreviations add tokens only when a form is present."""
+    return expand_tokens(value, set(TOKEN_PATTERN.findall(value.lower())))
 
 
 def retrieve_policies(

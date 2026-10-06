@@ -20,5 +20,7 @@ def test_v1_evaluation_set() -> None:
         "no-relevant-source",
         "effective-section-ranking",
         "quote-from-other-section",
+        "abbreviation-nitrogen-oxides-retrieves-nox",
+        "abbreviation-nox-retrieves-nitrogen-oxides",
     ]
     assert all(result.passed for result in results)

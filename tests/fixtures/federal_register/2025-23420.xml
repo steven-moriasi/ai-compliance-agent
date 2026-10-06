@@ -1,0 +1,104 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RULE>
+            <PREAMB>
+                <AGENCY TYPE="N">ENVIRONMENTAL PROTECTION AGENCY</AGENCY>
+                <CFR>40 CFR Part 180</CFR>
+                <DEPDOC>[EPA-HQ-OPP-2025-1973; FRL-13080-01-OCSPP]</DEPDOC>
+                <SUBJECT>Flupyradifurone; Pesticide Tolerance for Emergency Exemption</SUBJECT>
+                <AGY>
+                    <HD SOURCE="HED">AGENCY:</HD>
+                    <P>Environmental Protection Agency (EPA).</P>
+                </AGY>
+                <ACT>
+                    <HD SOURCE="HED">ACTION:</HD>
+                    <P>Final rule.</P>
+                </ACT>
+                <SUM>
+                    <HD SOURCE="HED">SUMMARY:</HD>
+                    <P>This regulation establishes time-limited tolerances for residues of flupyradifurone, including its metabolites and degradates, in or on sugarcane, cane and sugarcane, molasses. This action is in response to EPA's concurrence of a crisis exemption under the Federal Insecticide, Fungicide, and Rodenticide Act (FIFRA) authorizing use of the pesticide on sugarcane. This regulation establishes a maximum permissible level for residues of flupyradifurone in or on these commodities. The time-limited tolerances expire on December 31, 2028.</P>
+                </SUM>
+                <EFFDATE>
+                    <HD SOURCE="HED">DATES:</HD>
+                    <P>
+                        This rule is effective December 19, 2025. Objections and requests for hearings must be received on or before February 17, 2026 and must be filed in accordance with the instructions provided in 40 CFR part 178 (see also Unit I.C. of the 
+                        <E T="02">SUPPLEMENTARY INFORMATION</E>
+                        ).
+                    </P>
+                </EFFDATE>
+                <ADD>
+                    <HD SOURCE="HED">ADDRESSES:</HD>
+                    <P>
+                        The docket for this action, identified by docket identification (ID) number EPA-HQ-OPP-2025-1973, is available at 
+                        <E T="03">https://www.regulations.gov.</E>
+                         Additional information about dockets generally, along with instructions for visiting the 
+                        <E T="03">https://www.epa.gov/dockets.</E>
+                    </P>
+                </ADD>
+                <FURINF>
+                    <HD SOURCE="HED">FOR FURTHER INFORMATION CONTACT:</HD>
+                    <P>
+                        Charles Smith, Director, Registration Division (7505T), Office of Pesticide Programs, Environmental Protection Agency, 1200 Pennsylvania Ave. NW, Washington, DC 20460-0001; main telephone number: (202) 566-1030; email address: 
+                        <E T="03">RDFRNotices@epa.gov.</E>
+                    </P>
+                </FURINF>
+            </PREAMB>
+            <SUPLINF>
+                <HD SOURCE="HED">SUPPLEMENTARY INFORMATION:</HD>
+                <HD SOURCE="HD1">I. Executive Summary</HD>
+                <HD SOURCE="HD2">A. Does this action apply to me?</HD>
+                <P>You may be potentially affected by this action if you are an agricultural producer, food manufacturer, or pesticide manufacturer. The following list of North American Industrial Classification System (NAICS) codes is not intended to be exhaustive, but rather provides a guide to help readers determine whether this document applies to them:</P>
+                <P>• Crop production (NAICS code 111).</P>
+                <P>• Animal production (NAICS code 112).</P>
+                <P>• Food manufacturing (NAICS code 311).</P>
+                <HD SOURCE="HD2">B. What is EPA's authority for taking this action?</HD>
+                <HD SOURCE="HD2">C. How can I file an objection or hearing request?</HD>
+                <HD SOURCE="HD1">II. Background and Statutory Findings</HD>
+                <HD SOURCE="HD1">III. Emergency Exemption for Flupyradifurone on Sugarcane and FFDCA Tolerances</HD>
+                <HD SOURCE="HD1">IV. Aggregate Risk Assessment and Determination of Safety</HD>
+                <HD SOURCE="HD1">V. Other Considerations</HD>
+                <HD SOURCE="HD2">A. Analytical Enforcement Methodology</HD>
+                <HD SOURCE="HD2">B. International Residue Limits</HD>
+                <HD SOURCE="HD1">VI. Conclusion</HD>
+                <HD SOURCE="HD1">VII. Statutory and Executive Order Reviews</HD>
+                <HD SOURCE="HD2">A. Executive Order 12866: Regulatory Planning and Review</HD>
+                <HD SOURCE="HD2">B. Executive Order 14192: Unleashing Prosperity Through Deregulation</HD>
+                <HD SOURCE="HD2">C. Paperwork Reduction Act (PRA)</HD>
+                <HD SOURCE="HD2">D. Regulatory Flexibility Act (RFA)</HD>
+                <HD SOURCE="HD2">E. Unfunded Mandates Reform Act (UMRA)</HD>
+                <HD SOURCE="HD2">F. Executive Order 13132: Federalism</HD>
+                <HD SOURCE="HD2">G. Executive Order 13175: Consultation and Coordination With Indian Tribal Governments</HD>
+                <HD SOURCE="HD2">H. Executive Order 13045: Protection of Children From Environmental Health Risks and Safety Risks</HD>
+                <HD SOURCE="HD2">I. Executive Order 13211: Actions Concerning Regulations That Significantly Affect Energy Supply, Distribution or Use</HD>
+                <HD SOURCE="HD2">J. National Technology Transfer Advancement Act (NTTAA)</HD>
+                <HD SOURCE="HD2">K. Congressional Review Act (CRA)</HD>
+                <LSTSUB>
+                    <HD SOURCE="HED">List of Subjects in 40 CFR Part 180</HD>
+                    </LSTSUB>
+                <SIG>
+                    <DATED>Dated: December 4, 2025.</DATED>
+                    <NAME>Charles Smith,</NAME>
+                    <TITLE>Director, Registration Division, Office of Pesticide Programs.</TITLE>
+                </SIG>
+                <PART>
+                    <HD SOURCE="HED">PART 180—TOLERANCES AND EXEMPTIONS FOR PESTICIDE CHEMICAL RESIDUES IN FOOD</HD>
+                </PART>
+                <REGTEXT TITLE="40" PART="180">
+                    <AMDPAR>1. The authority citation for part 180 continues to read as follows:</AMDPAR>
+                    <AUTH>
+                        <HD SOURCE="HED">Authority: </HD>
+                        </AUTH>
+                </REGTEXT>
+                <REGTEXT TITLE="40" PART="180">
+                    <AMDPAR>2. In § 180.679, add paragraph (b) to read as follows:</AMDPAR>
+                    <SECTION>
+                        <SECTNO>§ 180.679 </SECTNO>
+                        <SUBJECT>Flupyradifurone; tolerances for residues.</SUBJECT>
+                        <STARS />
+                        <STARS />
+                    </SECTION>
+                </REGTEXT>
+            </SUPLINF>
+            <FRDOC>[FR Doc. 2025-23420 Filed 12-18-25; 8:45 am]</FRDOC>
+            <BILCOD>BILLING CODE 6560-50-P</BILCOD>
+        </RULE>
+        

@@ -32,3 +32,9 @@ class NotificationStatus(StrEnum):
     DELIVERING = "delivering"
     SENT = "sent"
     DEAD = "dead"
+
+
+class IngestionStatus(StrEnum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"

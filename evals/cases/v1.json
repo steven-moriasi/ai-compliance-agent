@@ -613,6 +613,104 @@
           "analysis_completed"
         ]
       }
+    },
+    {
+      "id": "abbreviation-nitrogen-oxides-retrieves-nox",
+      "document": "Inventory covers nitrogen oxides.",
+      "policies": [
+        {
+          "id": "policy-nox",
+          "name": "nox-limit",
+          "version": 1,
+          "content": "NOx remains regulated.",
+          "sections": [
+            {
+              "section_ref": "§ 60.5",
+              "heading": "Nitrogen oxides",
+              "text": "NOx remains regulated.",
+              "position": 0
+            }
+          ]
+        }
+      ],
+      "provider_outputs": [
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The inventory names the regulated pollutant.",
+          "citations": [
+            {
+              "policy_id": "policy-nox",
+              "policy_version": 1,
+              "section_ref": "§ 60.5",
+              "quote": "NOx remains regulated."
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "retrieved_sources": [
+          "policy-nox:1:§ 60.5"
+        ],
+        "validation_errors": [],
+        "injection_signals": [],
+        "status": "review_required",
+        "error_code": null,
+        "provider_attempts": 1,
+        "audit_events": [
+          "analysis_attempted",
+          "analysis_completed"
+        ]
+      }
+    },
+    {
+      "id": "abbreviation-nox-retrieves-nitrogen-oxides",
+      "document": "NOx remains regulated.",
+      "policies": [
+        {
+          "id": "policy-spelled-out",
+          "name": "spelled-out-limit",
+          "version": 1,
+          "content": "Inventory covers nitrogen oxides only.",
+          "sections": [
+            {
+              "section_ref": "§ 60.5",
+              "heading": "Spelled out limit",
+              "text": "Inventory covers nitrogen oxides only.",
+              "position": 0
+            }
+          ]
+        }
+      ],
+      "provider_outputs": [
+        {
+          "outcome": "compliant",
+          "confidence": 0.9,
+          "rationale": "The submission names the spelled out pollutant.",
+          "citations": [
+            {
+              "policy_id": "policy-spelled-out",
+              "policy_version": 1,
+              "section_ref": "§ 60.5",
+              "quote": "Inventory covers nitrogen oxides only."
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "retrieved_sources": [
+          "policy-spelled-out:1:§ 60.5"
+        ],
+        "validation_errors": [],
+        "injection_signals": [],
+        "status": "review_required",
+        "error_code": null,
+        "provider_attempts": 1,
+        "audit_events": [
+          "analysis_attempted",
+          "analysis_completed"
+        ]
+      }
     }
   ]
 }

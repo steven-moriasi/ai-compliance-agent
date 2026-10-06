@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     notification_webhook_secret: SecretStr | None = None
     notification_lease_seconds: int = Field(default=60, ge=15, le=600)
     notification_max_attempts: int = Field(default=5, ge=1, le=20)
+    ingest_contact: str = "local-development"
+    ingest_cache_dir: str = "data/raw/federal_register"
 
 
 @lru_cache
