@@ -33,7 +33,7 @@ The model has no authority to mutate policies or finalize decisions. Every compl
 | Reproducibility | deterministic local provider, pinned direct dependencies, Docker and Compose |
 | Structured AI | strict JSON-schema request and Pydantic response validation |
 | Grounding | effective-dated section retrieval and exact-quote validation within the cited section |
-| Retrieval | PostgreSQL full text in SQL; keyword overlap remains the SQLite and evaluation path |
+| Retrieval | PostgreSQL hybrid (full text + MiniLM in pgvector); keyword overlap remains the SQLite baseline |
 | Hallucination mitigation | retrieved-source checks, confidence finding, mandatory review |
 | Regression evidence | versioned deterministic corpus for retrieval, citations, retries, and failures |
 | Prompt injection | untrusted-document envelope, signal detection, no model-controlled actions |
@@ -110,19 +110,29 @@ Webhook delivery is an opt-in profile because it requires an external endpoint a
 See the [runbook](docs/RUNBOOK.md) for startup and incident procedures.
 
 `docker compose up --build -d` is the local stack. With `COMPLIANCE_RETRIEVAL_MODE` unset,
-PostgreSQL search uses full text and SQLite keeps keyword overlap. Load the cached Federal
-Register window after migrations:
+PostgreSQL search uses hybrid retrieval and SQLite keeps keyword overlap. Hybrid needs the
+`retrieval` extra and a built `section_embeddings` index. Analysis falls back to full text when
+either is missing. Load the cached Federal Register window after migrations, then embed it:
 
 ```bash
 set COMPLIANCE_DATABASE_URL=postgresql+psycopg://compliance:compliance@127.0.0.1:5432/compliance
 alembic upgrade head
 py -3 -m app.ingestion.federal_register ingest
+py -3 -m pip install -e '.[retrieval]' --extra-index-url https://download.pytorch.org/whl/cpu
+py -3 -m app.ingestion.embed
 ```
 
 On this host that load took 130502 ms and wrote dataset `840a6be0a156`
-(`evals/reports/federal_register_corpus_postgres.json`). Full-text p95 over 50 policy titles was
-131.6251999232918 ms (`evals/reports/retrieval_latency_2026-10-07.json`). Keyword search on the
-same database is still the slow baseline.
+(`evals/reports/federal_register_corpus_postgres.json`). Embedding all 34174 sections took
+5422.487745499937 seconds at 6.054416633259385 sections per second, and 24272 sections were
+truncated at 256 tokens (`evals/reports/embedding_index_2026-10-07.json`). Full-text p95 over
+50 policy titles was 131.6251999232918 ms
+(`evals/reports/retrieval_latency_2026-10-07.json`). Vector p95 on the same titles was
+236.06449492508546 ms; hybrid p95 was 1594.2314949992574 ms
+(`evals/reports/retrieval_latency_vector_2026-10-07.json`). The mode comparison that selected
+hybrid is in `evals/reports/retrieval_eval_2026-10-07.json` and
+[ADR 008](docs/adr/008-hybrid-retrieval-default.md). Keyword search on the same database is
+still the slow baseline.
 
 Stop the stack:
 

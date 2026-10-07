@@ -19,6 +19,7 @@ from app.core.config import get_settings
 from app.domain.enums import PolicyStatus
 from app.domain.models import Policy
 from app.domain.types import JsonObject
+from app.services.embeddings import Embedder, embedding_model_id, sentence_transformer_embedder
 from app.services.retrieval import RetrievalMode, retrieve_policies
 from evals.host import git_sha, host_summary, recorded_at
 
@@ -40,6 +41,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Measure retrieval latency")
     parser.add_argument("--queries", type=int, default=50)
     parser.add_argument("--keyword-queries", type=int, default=10)
+    parser.add_argument(
+        "--modes",
+        default="fulltext,keyword",
+        help="Comma-separated modes. Keyword uses --keyword-queries.",
+    )
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--as-of", type=date.fromisoformat, default=date(2026, 10, 7))
@@ -55,17 +61,34 @@ def main() -> int:
     try:
         with factory() as session:
             queries = _sample_titles(session, args.queries, args.seed)
-            checks = _sanity(session, args.as_of, args.limit)
-            modes: dict[str, JsonObject] = {
-                "fulltext": _time_mode(session, queries, "fulltext", args.as_of, args.limit),
-                "keyword": _time_mode(
+            selected = [item.strip() for item in str(args.modes).split(",") if item.strip()]
+            checks = (
+                _sanity(session, args.as_of, args.limit) if "fulltext" in selected else []
+            )
+            embedder: Embedder | None = None
+            model_id = None
+            if any(item in {"vector", "embedding", "hybrid"} for item in selected):
+                embedder = sentence_transformer_embedder(
+                    settings.embedding_model,
+                    settings.embedding_revision,
+                )
+                model_id = embedding_model_id(
+                    settings.embedding_model,
+                    settings.embedding_revision,
+                )
+            modes: dict[str, JsonObject] = {}
+            for item in selected:
+                mode: RetrievalMode = _mode(item)
+                sample = queries[: args.keyword_queries] if mode == "keyword" else queries
+                modes[item] = _time_mode(
                     session,
-                    queries[: args.keyword_queries],
-                    "keyword",
+                    sample,
+                    mode,
                     args.as_of,
                     args.limit,
-                ),
-            }
+                    embedder,
+                    model_id,
+                )
     finally:
         engine.dispose()
     payload: dict[str, object] = {
@@ -74,7 +97,8 @@ def main() -> int:
         "command": (
             "py -3 -m evals.retrieval_latency "
             f"--queries {args.queries} --keyword-queries {args.keyword_queries} "
-            f"--limit {args.limit} --seed {args.seed} --as-of {args.as_of.isoformat()}"
+            f"--modes {args.modes} --limit {args.limit} --seed {args.seed} "
+            f"--as-of {args.as_of.isoformat()} --output {args.output.as_posix()}"
         ),
         "database": _database(settings.database_url),
         "hardware": host_summary(),
@@ -116,20 +140,52 @@ def _sample_titles(session: Session, count: int, seed: int) -> list[dict[str, st
     return random.Random(seed).sample(pool, count)  # noqa: S311
 
 
+def _mode(value: str) -> RetrievalMode:
+    modes: dict[str, RetrievalMode] = {
+        "keyword": "keyword",
+        "fulltext": "fulltext",
+        "vector": "vector",
+        "embedding": "embedding",
+        "hybrid": "hybrid",
+    }
+    selected = modes.get(value)
+    if selected is None:
+        raise SystemExit(f"unknown retrieval mode {value}")
+    return selected
+
+
 def _time_mode(
     session: Session,
     queries: list[dict[str, str]],
     mode: RetrievalMode,
     as_of: date,
     limit: int,
+    embedder: Embedder | None,
+    model_id: str | None,
 ) -> JsonObject:
     if queries:
-        retrieve_policies(session, queries[0]["query"], as_of, limit, mode=mode)
+        retrieve_policies(
+            session,
+            queries[0]["query"],
+            as_of,
+            limit,
+            mode=mode,
+            embedder=embedder,
+            embedding_model_id=model_id,
+        )
     elapsed: list[float] = []
     hits: list[int] = []
     for item in queries:
         started = time.perf_counter()
-        found = retrieve_policies(session, item["query"], as_of, limit, mode=mode)
+        found = retrieve_policies(
+            session,
+            item["query"],
+            as_of,
+            limit,
+            mode=mode,
+            embedder=embedder,
+            embedding_model_id=model_id,
+        )
         elapsed.append((time.perf_counter() - started) * 1000)
         hits.append(len(found))
     return {

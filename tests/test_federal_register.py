@@ -22,6 +22,7 @@ from app.ingestion.federal_register.normalize import (
     normalize_text,
 )
 from app.ingestion.federal_register.parse import (
+    document_action,
     extract_document_xml,
     parse_federal_register_xml,
     parse_plain_text,
@@ -207,6 +208,12 @@ def test_real_fixtures_parse_sections_and_subscripts() -> None:
         parsed = parse_federal_register_xml((FIXTURES / name).read_bytes())
         assert parsed
         assert any(section.section_ref.startswith("§") for section in parsed)
+
+
+def test_action_line_comes_from_the_preamble() -> None:
+    assert document_action((FIXTURES / "2024-19699.xml").read_bytes()) == "Final rule."
+    assert document_action(_issue_xml(), "2024-19699") == "Final rule."
+    assert document_action(b"<html>access</html>") == ""
 
 
 def test_plain_text_fallback_uses_outline_labels() -> None:

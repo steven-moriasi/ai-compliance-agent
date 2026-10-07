@@ -1,18 +1,27 @@
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 from typing import Protocol, cast
 
 import httpx
 from pydantic import JsonValue, ValidationError
 from sqlalchemy import update
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.metrics import RETRIEVAL_FALLBACKS
 from app.domain.enums import AnalysisOutcome, CaseStatus
 from app.domain.models import ComplianceCase
 from app.domain.types import JsonObject
 from app.services.audit import append_audit_event
 from app.services.classifier import CfrPrior
+from app.services.embeddings import (
+    RetrievalUnavailable,
+    embedding_model_id,
+    sentence_transformer_embedder,
+)
 from app.services.injection import detect_prompt_injection
+from app.services.lease import lease_heartbeat
 from app.services.providers import (
     MalformedModelOutputError,
     ModelProvider,
@@ -20,7 +29,12 @@ from app.services.providers import (
     ModelResponse,
 )
 from app.services.redaction import redact_personal_data
-from app.services.retrieval import retrieve_policies
+from app.services.retrieval import (
+    RetrievalMode,
+    RetrievedPolicy,
+    resolve_retrieval_mode,
+    retrieve_policies,
+)
 from app.services.validation import validate_analysis
 
 MODEL_FIXABLE_ERRORS = frozenset(
@@ -51,6 +65,88 @@ class AnalysisService:
         self.cfr_prior = cfr_prior
         self._redaction_count = 0
 
+    def _heartbeat(
+        self,
+        case: ComplianceCase,
+        worker_id: str,
+    ) -> AbstractContextManager[None]:
+        interval = self.settings.lease_renewal_seconds
+        bind = self.session.get_bind()
+        engine = bind.engine if isinstance(bind, Connection) else bind
+        return lease_heartbeat(
+            engine,
+            case_id=case.id,
+            worker_id=worker_id,
+            fencing_token=case.fencing_token,
+            lease_seconds=self.settings.analysis_lease_seconds,
+            interval_seconds=float(interval) if interval is not None else None,
+        )
+
+    def _retrieve(
+        self,
+        case: ComplianceCase,
+        correlation_id: str,
+        worker_id: str,
+    ) -> list[RetrievedPolicy]:
+        bind = self.session.get_bind()
+        dialect = bind.dialect.name if bind is not None else "sqlite"
+        selected = resolve_retrieval_mode(self.settings.retrieval_mode, dialect)
+        model_id = embedding_model_id(
+            self.settings.embedding_model,
+            self.settings.embedding_revision,
+        )
+        embedder = None
+        if selected in {"vector", "embedding", "hybrid"}:
+            try:
+                embedder = sentence_transformer_embedder(
+                    self.settings.embedding_model,
+                    self.settings.embedding_revision,
+                )
+            except RetrievalUnavailable as exc:
+                return self._fallback(case, correlation_id, worker_id, selected, dialect, str(exc))
+        try:
+            return retrieve_policies(
+                self.session,
+                case.document.content,
+                case.created_at.date(),
+                mode=self.settings.retrieval_mode,
+                embedder=embedder,
+                embedding_model_id=model_id,
+                cfr_prior=self.cfr_prior,
+            )
+        except RetrievalUnavailable as exc:
+            if selected not in {"vector", "embedding", "hybrid"}:
+                raise
+            return self._fallback(case, correlation_id, worker_id, selected, dialect, str(exc))
+
+    def _fallback(
+        self,
+        case: ComplianceCase,
+        correlation_id: str,
+        worker_id: str,
+        selected: str,
+        dialect: str,
+        reason: str,
+    ) -> list[RetrievedPolicy]:
+        """Lexical search keeps the case moving when the embedding index cannot be used."""
+        RETRIEVAL_FALLBACKS.inc()
+        append_audit_event(
+            self.session,
+            event_type="retrieval_fallback",
+            actor_id=worker_id,
+            correlation_id=correlation_id,
+            case_id=case.id,
+            details={"from_mode": selected, "reason": reason[:240]},
+        )
+        fallback: RetrievalMode = "fulltext" if dialect == "postgresql" else "keyword"
+        return retrieve_policies(
+            self.session,
+            case.document.content,
+            case.created_at.date(),
+            mode=fallback,
+            cfr_prior=self.cfr_prior,
+        )
+
     def analyze(
         self,
         case: ComplianceCase,
@@ -59,12 +155,8 @@ class AnalysisService:
     ) -> ComplianceCase:
         redaction = redact_personal_data(case.document.content)
         self._redaction_count = redaction.count
-        policies = retrieve_policies(
-            self.session,
-            case.document.content,
-            case.created_at.date(),
-            cfr_prior=self.cfr_prior,
-        )
+        with self._heartbeat(case, worker_id):
+            policies = self._retrieve(case, correlation_id, worker_id)
         injection_signals = detect_prompt_injection(case.document.content)
         if not policies:
             validation_errors = ["no_relevant_source"]
@@ -97,14 +189,15 @@ class AnalysisService:
 
         for attempt in (1, 2):
             try:
-                response = self.provider.analyze(
-                    ModelRequest(
-                        system_prompt=case.prompt_template.system_prompt,
-                        document=redaction.text,
-                        policies=policies,
-                        validation_feedback=validation_feedback,
+                with self._heartbeat(case, worker_id):
+                    response = self.provider.analyze(
+                        ModelRequest(
+                            system_prompt=case.prompt_template.system_prompt,
+                            document=redaction.text,
+                            policies=policies,
+                            validation_feedback=validation_feedback,
+                        )
                     )
-                )
             except (MalformedModelOutputError, ValidationError):
                 attempt_events.append(
                     self._attempt_event(

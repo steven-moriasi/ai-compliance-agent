@@ -11,8 +11,9 @@ are ordered by risk reduction rather than feature volume.
   jurisdiction, regulated-entity profile, or transitional-rule model.
 - Effective windows are filtered but overlapping active versions and conflicting sections are not
   rejected automatically.
-- Lexical ranking and exact-quote checks establish reproducible traceability, not semantic recall,
-  legal interpretation, or regulatory correctness.
+- Hybrid retrieval is measured on a document set and a curated set. It is not a legal-expert
+  judgment, and the section-level question set is not built yet. Exact-quote checks still do not
+  prove regulatory correctness.
 - The deterministic corpus proves application behavior against synthetic fixtures; it is not a
   legal-expert benchmark and does not measure live-provider quality.
 - PostgreSQL concurrency tests cover claiming, fencing, and notification reclaim, but not sustained
@@ -35,7 +36,8 @@ are ordered by risk reduction rather than feature volume.
 
 ## Next: operational maturity
 
-- Use database time and renewable leases for long-running model calls.
+- Lease renewal during retrieval and provider calls is implemented. Database time, instead of
+  the application clock, is not.
 - Add queue-age, review-age, dead-letter, token, and estimated-cost metrics.
 - Add structured logging with correlation IDs and explicit sensitive-field redaction.
 - Add controlled dead-letter re-drive with an operator audit event.

@@ -63,8 +63,8 @@ DEMO_PAGE = """<!DOCTYPE html>
         <select id="mode" name="mode">
           <option value="keyword" selected>keyword</option>
           <option value="fulltext">fulltext</option>
+          <option value="vector">vector</option>
           <option value="hybrid">hybrid</option>
-          <option value="embedding">embedding</option>
         </select>
         <label for="as-of">As of</label>
         <input id="as-of" name="as_of" type="date" required>

@@ -146,13 +146,64 @@ first section, `preamble:II.A.1`. `PM2.5` returned `§ 52.1770#5` first. `§ 60.
 `preamble:III.F` first, at lexical score 0.3, not a section whose reference is `§ 60.4`. The
 stored vector is the heading plus the section text. It does not include the section reference.
 
+## Embedding index
+
+Recorded in `evals/reports/embedding_index_2026-10-07.json` at `2026-10-07T12:37:07Z`, git
+`aa222a341b9dd4171fa5a75d68865c7f0851a6bd`. Model
+`sentence-transformers/all-MiniLM-L6-v2` revision `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`,
+384 dimensions, safetensors.
+
+| Item | Measured value |
+| --- | --- |
+| Sections stored | 34174 |
+| Sections embedded in that process | 32830 |
+| Sections skipped because they were already stored | 1344 |
+| Truncated at `max_seq_length` 256 | 24272 |
+| Elapsed seconds | 5422.487745499937 |
+| Sections per second | 6.054416633259385 |
+
+The skipped rows are the batches committed before this process was resumed. Throughput is
+embedded sections divided by this process's elapsed time, including model load. 24272 truncated
+sections follow from chunking near 350 words into a 256-token model. Those vectors were still stored.
+
+## Vector and hybrid latency
+
+Recorded in `evals/reports/retrieval_latency_vector_2026-10-07.json` at `2026-10-07T12:41:29Z`,
+same git SHA and dataset, same 50 titles and seed as the full-text latency report.
+
+| Mode | Queries | p50 | p95 | max |
+| --- | --- | --- | --- | --- |
+| vector | 50 | 164.90989999147132 ms | 236.06449492508546 ms | 267.7090000361204 ms |
+| hybrid | 50 | 247.5049999775365 ms | 1594.2314949992574 ms | 1815.9228999866173 ms |
+
+Hybrid p95 on these titles is over one second. Full-text p95 on the same titles is not.
+
+## Retrieval quality
+
+Recorded in `evals/reports/retrieval_eval_2026-10-07.json` at `2026-10-07T13:06:56Z`. The document
+set has 199 items and mean lexical overlap 0.897499527638191. The curated set has 20 items and
+mean lexical overlap 0.58333335. `section_level_v1` is missing. Recall@5:
+
+| Mode | Document set | Curated set (14 ranked items) |
+| --- | --- | --- |
+| keyword | 0.7035175879396985 | 0.07142857142857142 |
+| fulltext | 0.20603015075376885 | 0.42857142857142855 |
+| vector | 0.7286432160804021 | 0.5 |
+| hybrid | 0.7286432160804021 | 0.6428571428571429 |
+| hybrid_prior | 0.7286432160804021 | 0.6428571428571429 |
+
+Keyword `p50_ms` in that report is the score after the sections were loaded. The document-set
+load was 228749.9185000779 ms. It is not the uncached keyword latency in the table above.
+Full text returned hits for 0 of 4 negative curated queries. Vector, hybrid, hybrid plus the
+prior, and keyword returned hits for all 4. The prior does not move curated MRR@10 by more than
+0.002. [ADR 008](adr/008-hybrid-retrieval-default.md) keeps it off the default path.
+
 ## Not measured
 
 - `evals/reports/local_model.json` does not exist. Generation latency, token counts, and output
   quality for `qwen2.5:3b` were not measured.
-- The retrieval extra was not installed, and no embedding-index report exists. Embedding and hybrid
-  latency were not measured. PostgreSQL defaults to full text. SQLite and the deterministic
-  evaluation corpus stay on keyword overlap.
+- No section-level question set was scored. Building it requires the local model to paraphrase
+  sections without copying long spans.
 - No CFR-part drift report was written. The 0.25 population-stability cutoff in code is a check
   threshold, not a measured shift on this corpus.
 - The disk-free figure above is the 2026-10-06 snapshot. It does not include later cache growth.

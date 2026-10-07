@@ -70,6 +70,8 @@ def retrieve_fulltext(
                 position=int(row["position"]),
                 score=lexical + bonus,
                 lexical_score=lexical,
+                section_id=_text(row.get("section_id")),
+                document_number=_optional_text(row.get("document_number")),
             )
         )
     ranked.sort(
@@ -82,6 +84,14 @@ def retrieve_fulltext(
         )
     )
     return ranked[:limit]
+
+
+def _text(value: object) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _optional_text(value: object) -> str | None:
+    return value if isinstance(value, str) else None
 
 
 def _prior_bonus(references: object, predictions: Mapping[str, float]) -> float:
@@ -103,7 +113,8 @@ _FULLTEXT_SQL = """
             policy.name,
             policy.version,
             policy.content,
-            policy.cfr_references
+            policy.cfr_references,
+            policy.document_number
         FROM {policies} AS policy
         WHERE policy.status = 'ACTIVE'
           AND (policy.effective_from IS NULL OR policy.effective_from <= :case_date)
@@ -124,6 +135,8 @@ _FULLTEXT_SQL = """
             s.text AS content,
             s.position AS position,
             p.cfr_references AS cfr_references,
+            s.id AS section_id,
+            p.document_number AS document_number,
             ts_rank_cd(s.search_vector, query.tsq) AS rank
         FROM {sections} AS s
         JOIN {policies} AS p ON p.id = s.policy_id
@@ -142,6 +155,8 @@ _FULLTEXT_SQL = """
             p.content,
             0,
             p.cfr_references,
+            NULL,
+            p.document_number,
             ts_rank_cd(to_tsvector('english', coalesce(p.content, '')), query.tsq)
         FROM sectionless AS p
         CROSS JOIN query
@@ -153,13 +168,13 @@ _FULLTEXT_SQL = """
 
 
 def _sql(session: Session) -> str:
-    policies = _table(session, "policies")
-    sections = _table(session, "policy_sections")
+    policies = qualified_table(session, "policies")
+    sections = qualified_table(session, "policy_sections")
     # Identifiers are fixed names, or a schema that already matched a safe pattern.
     return _FULLTEXT_SQL.format(policies=policies, sections=sections)
 
 
-def _table(session: Session, name: str) -> str:
+def qualified_table(session: Session, name: str) -> str:
     bind = session.get_bind()
     options = bind.get_execution_options() if bind is not None else {}
     schema = (options.get("schema_translate_map") or {}).get(None)

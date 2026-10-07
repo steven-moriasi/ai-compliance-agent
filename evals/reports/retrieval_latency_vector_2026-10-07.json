@@ -1,0 +1,39 @@
+{
+  "recorded_at": "2026-10-07T12:41:29.828194+00:00",
+  "git_sha": "aa222a341b9dd4171fa5a75d68865c7f0851a6bd",
+  "command": "py -3 -m evals.retrieval_latency --queries 50 --keyword-queries 10 --modes vector,hybrid --limit 5 --seed 7 --as-of 2026-10-07 --output evals/reports/retrieval_latency_vector_2026-10-07.json",
+  "database": "postgresql+psycopg://127.0.0.1:5432/compliance",
+  "hardware": {
+    "cpu": "Intel64 Family 6 Model 126 Stepping 5, GenuineIntel",
+    "cpu_count": 8,
+    "ram_bytes": 16745918464,
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.7",
+    "machine": "AMD64",
+    "gpu": null
+  },
+  "dataset_version": "840a6be0a156",
+  "as_of": "2026-10-07",
+  "seed": 7,
+  "query_source": "Active policy titles, sampled with a fixed seed. Ingestion does not store the Federal Register action line, so these are not yet the phase-3 action-plus-title questions.",
+  "keyword_note": "Keyword retrieval still loads every eligible section into Python. It was timed on the first 10 sampled titles, not the full set.",
+  "modes": {
+    "vector": {
+      "queries": 50,
+      "p50_ms": 164.90989999147132,
+      "p95_ms": 236.06449492508546,
+      "max_ms": 267.7090000361204,
+      "min_ms": 83.19620008114725,
+      "mean_hits": 5.0
+    },
+    "hybrid": {
+      "queries": 50,
+      "p50_ms": 247.5049999775365,
+      "p95_ms": 1594.2314949992574,
+      "max_ms": 1815.9228999866173,
+      "min_ms": 120.9353000158444,
+      "mean_hits": 5.0
+    }
+  },
+  "sanity": []
+}

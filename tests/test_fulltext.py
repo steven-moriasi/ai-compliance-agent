@@ -11,7 +11,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from app.domain.enums import PolicyStatus
 from app.domain.models import Base, Policy, PolicySection
 from app.services.embeddings import RetrievalUnavailable
-from app.services.fulltext import websearch_query
+from app.services.fulltext import qualified_table, retrieve_fulltext, websearch_query
 from app.services.retrieval import resolve_retrieval_mode, retrieve_policies
 
 pytestmark = pytest.mark.postgres
@@ -28,10 +28,43 @@ def test_websearch_query_adds_synonym_or_terms() -> None:
     assert websearch_query("stack inventory") == "stack inventory"
 
 
-def test_sqlite_refuses_fulltext_and_postgres_defaults_to_it(
+def test_fulltext_ranks_returned_rows_and_applies_the_prior(
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        _row("policy-b", "b-rule", "2", 0.2, None),
+        _row("policy-a", "a-rule", "1", 0.2, [{"title": 40, "part": "60"}]),
+    ]
+    with session_factory() as session:
+        monkeypatch.setattr(session, "execute", lambda _statement, _params: _Mappings(rows))
+        hits = retrieve_fulltext(
+            session,
+            "nox",
+            date(2026, 6, 1),
+            5,
+            {"40:60": 1.0},
+        )
+        assert qualified_table(session, "policies") == "policies"
+    assert [item.id for item in hits] == ["policy-a", "policy-b"]
+    assert hits[0].score > hits[1].score
+
+
+def test_qualified_table_rejects_an_unsafe_schema() -> None:
+    engine = create_engine(
+        "sqlite://",
+        execution_options={"schema_translate_map": {None: "bad-name"}},
+    )
+    with sessionmaker(bind=engine)() as session:
+        with pytest.raises(RetrievalUnavailable, match="schema"):
+            qualified_table(session, "policies")
+    engine.dispose()
+
+
+def test_sqlite_refuses_fulltext_and_postgres_defaults_to_hybrid(
     session_factory: sessionmaker[Session],
 ) -> None:
-    assert resolve_retrieval_mode(None, "postgresql") == "fulltext"
+    assert resolve_retrieval_mode(None, "postgresql") == "hybrid"
     assert resolve_retrieval_mode(None, "sqlite") == "keyword"
     assert resolve_retrieval_mode("keyword", "postgresql") == "keyword"
     with session_factory() as session:
@@ -128,6 +161,34 @@ def test_fulltext_respects_status_dates_and_synonyms(
     assert [item.id for item in oxides] == ["policy-nox"]
     assert [item.id for item in numbered] == ["policy-section"]
     assert numbered[0].section_ref == "60.4"
+
+
+def _row(
+    policy_id: str,
+    name: str,
+    section_ref: str,
+    rank: float,
+    references: object,
+) -> dict[str, object]:
+    return {
+        "policy_id": policy_id,
+        "name": name,
+        "version": 1,
+        "section_ref": section_ref,
+        "heading": None,
+        "content": "text",
+        "position": 0,
+        "cfr_references": references,
+        "rank": rank,
+    }
+
+
+class _Mappings:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self._rows = rows
+
+    def mappings(self) -> list[dict[str, object]]:
+        return self._rows
 
 
 def _policy(
