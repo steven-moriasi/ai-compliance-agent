@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-config
+  namespace: compliance
+  labels:
+    app.kubernetes.io/name: ai-compliance-agent
+data:
+  COMPLIANCE_ENVIRONMENT: development
+  COMPLIANCE_AUTH_MODE: development
+  COMPLIANCE_MODEL_PROVIDER: deterministic

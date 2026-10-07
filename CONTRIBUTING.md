@@ -18,9 +18,10 @@ alembic upgrade head
 Before submitting a change:
 
 ```bash
-ruff check app tests alembic
-mypy app
-pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+ruff check app tests evals alembic
+mypy app evals
+python -m evals.run evals/cases/v1.json
+pytest --cov=app --cov-report=term-missing --cov-fail-under=85
 docker build -t ai-compliance-agent:local .
 docker compose config --quiet
 ```

@@ -27,7 +27,7 @@ jobs:
       - run: python -m evals.run evals/cases/v1.json
       - run: >-
           pytest --cov=app --cov-report=term-missing --cov-report=xml
-          --cov-fail-under=80
+          --cov-fail-under=85
 
   migration:
     runs-on: ubuntu-latest
@@ -61,6 +61,7 @@ jobs:
       - run: pytest -m postgres tests/test_postgres_concurrency.py
 
   container:
+    needs: [quality]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

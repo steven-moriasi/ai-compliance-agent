@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: compliance
+  labels:
+    app.kubernetes.io/name: ai-compliance-agent
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-compliance-agent
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-compliance-agent
+        app.kubernetes.io/component: worker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      initContainers:
+        - name: wait-for-migration
+          image: ai-compliance-agent:local
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: compliance-database
+          command: ["python", "-c"]
+          args:
+            - |
+              import os
+              import time
+              import psycopg
+              url = os.environ["COMPLIANCE_DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://", 1)
+              for _ in range(60):
+                  try:
+                      with psycopg.connect(url, connect_timeout=3) as conn:
+                          row = conn.execute("SELECT version_num FROM alembic_version").fetchone()
+                      if row and row[0]:
+                          raise SystemExit(0)
+                  except Exception:
+                      time.sleep(2)
+              raise SystemExit(1)
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: worker
+          image: ai-compliance-agent:local
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.worker"]
+          envFrom:
+            - configMapRef:
+                name: compliance-config
+            - secretRef:
+                name: compliance-database
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
