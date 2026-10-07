@@ -171,6 +171,17 @@ class ReviewRead(ReviewCreate):
     created_at: datetime
 
 
+class CorpusStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    policies: int
+    active_policies: int
+    sections: int
+    dataset_version: str | None
+    publication_date_min: date | None
+    publication_date_max: date | None
+
+
 class SearchHit(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
