@@ -40,9 +40,10 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers --disable-warnings"
+addopts = "-q --strict-markers --disable-warnings -m \"not models\""
 markers = [
     "postgres: tests that require COMPLIANCE_TEST_DATABASE_URL and PostgreSQL",
+    "models: tests that train a local PyTorch model",
     "local_model: tests that call a running local model server",
 ]
 
@@ -63,6 +64,13 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["sentence_transformers", "sentence_transformers.*"]
+module = [
+    "sentence_transformers",
+    "sentence_transformers.*",
+    "torch",
+    "torch.*",
+    "safetensors",
+    "safetensors.*",
+]
 ignore_missing_imports = true
 follow_imports = "skip"

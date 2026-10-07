@@ -1,7 +1,9 @@
-"""CFR-part prior and a population-stability check.
+"""Add-one naive Bayes over CFR part labels, plus a population-stability check.
 
-The prior only reranks policies that retrieval has already kept. Active status
-and the effective-date window stay in retrieval.
+Each training text contributes its token set once. `predict_cfr_parts` turns
+those counts into a probability for every label. Retrieval may use that
+distribution as a rerank prior. The score does not approve, reject, or edit a
+policy. Active status and the effective-date window stay in retrieval.
 """
 
 import json

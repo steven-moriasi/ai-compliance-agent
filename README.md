@@ -243,8 +243,8 @@ All variables use the `COMPLIANCE_` prefix.
 ## Quality gates
 
 ```bash
-ruff check app tests evals alembic
-mypy app evals
+ruff check app tests evals alembic ml
+mypy app evals ml
 python -m evals.run evals/cases/v1.json
 pytest --cov=app --cov-report=term-missing --cov-fail-under=85
 docker build -t ai-compliance-agent:local .
