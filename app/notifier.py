@@ -5,9 +5,11 @@ import httpx
 from app.core.config import get_settings
 from app.infrastructure.database import SessionLocal
 from app.services.notifications import claim_notification, deliver_notification
+from app.services.redaction import install_log_redaction
 
 
 def run_notifier() -> None:
+    install_log_redaction()
     settings = get_settings()
     if settings.notification_webhook_url is None or settings.notification_webhook_secret is None:
         raise ValueError("Notification webhook URL and secret are required")

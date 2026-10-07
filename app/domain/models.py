@@ -136,6 +136,7 @@ class ComplianceCase(Base):
     citations: Mapped[list[dict[str, str | int]]] = mapped_column(JSON, default=list)
     validation_errors: Mapped[list[str]] = mapped_column(JSON, default=list)
     injection_signals: Mapped[list[str]] = mapped_column(JSON, default=list)
+    redaction_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

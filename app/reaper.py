@@ -4,9 +4,11 @@ import uuid
 from app.core.config import get_settings
 from app.infrastructure.database import SessionLocal
 from app.services.cases import reap_expired_cases
+from app.services.redaction import install_log_redaction
 
 
 def run_reaper() -> None:
+    install_log_redaction()
     settings = get_settings()
     while True:
         with SessionLocal() as session:

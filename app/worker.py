@@ -7,9 +7,11 @@ from app.infrastructure.database import SessionLocal
 from app.services.analysis import AnalysisService
 from app.services.cases import claim_next_case
 from app.services.provider_factory import build_provider
+from app.services.redaction import install_log_redaction
 
 
 def run_worker() -> None:
+    install_log_redaction()
     settings = get_settings()
     provider = build_provider(settings)
     worker_id = f"analysis-worker-{uuid.uuid4()}"

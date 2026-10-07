@@ -144,6 +144,7 @@ class CaseRead(BaseModel):
     citations: list[dict[str, str | int]]
     validation_errors: list[str]
     injection_signals: list[str]
+    redaction_count: int | None
     input_tokens: int | None
     output_tokens: int | None
     latency_ms: int | None

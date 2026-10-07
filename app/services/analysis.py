@@ -18,6 +18,7 @@ from app.services.providers import (
     ModelRequest,
     ModelResponse,
 )
+from app.services.redaction import redact_personal_data
 from app.services.retrieval import retrieve_policies
 from app.services.validation import validate_analysis
 
@@ -40,6 +41,7 @@ class AnalysisService:
         self.session = session
         self.settings = settings
         self.provider = provider
+        self._redaction_count = 0
 
     def analyze(
         self,
@@ -47,6 +49,8 @@ class AnalysisService:
         correlation_id: str,
         worker_id: str,
     ) -> ComplianceCase:
+        redaction = redact_personal_data(case.document.content)
+        self._redaction_count = redaction.count
         policies = retrieve_policies(
             self.session,
             case.document.content,
@@ -87,7 +91,7 @@ class AnalysisService:
                 response = self.provider.analyze(
                     ModelRequest(
                         system_prompt=case.prompt_template.system_prompt,
-                        document=case.document.content,
+                        document=redaction.text,
                         policies=policies,
                         validation_feedback=validation_feedback,
                     )
@@ -383,6 +387,7 @@ class AnalysisService:
                 "provider_invoked": provider_invoked,
                 "validation_error_count": len(validation_errors),
                 "injection_signal_count": len(injection_signals),
+                "redaction_count": self._redaction_count,
                 "fencing_token": case.fencing_token,
             },
         )
@@ -404,7 +409,7 @@ class AnalysisService:
                     ComplianceCase.fencing_token == case.fencing_token,
                     ComplianceCase.lease_expires_at > datetime.now(UTC),
                 )
-                .values(**values)
+                .values(**values, redaction_count=self._redaction_count)
                 .execution_options(synchronize_session=False)
             ),
         )
