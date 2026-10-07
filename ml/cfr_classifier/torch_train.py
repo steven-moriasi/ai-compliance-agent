@@ -6,6 +6,16 @@ from pathlib import Path
 from typing import Literal
 
 
+def prepare_torch() -> str:
+    """Load torch before a timed fit so the import is not part of that head's elapsed time."""
+    import torch
+    from safetensors.torch import save_file
+
+    if not callable(save_file):
+        raise RuntimeError("safetensors torch saver is unavailable")
+    return str(torch.__version__)
+
+
 def fit_and_score(
     train_x: Sequence[Sequence[float]],
     train_y: Sequence[Sequence[int]],

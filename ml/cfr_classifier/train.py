@@ -18,7 +18,7 @@ from app.services.classifier import cfr_labels
 from evals.host import git_sha, host_summary, recorded_at
 from ml.cfr_classifier.compare import InsufficientCorpus, run_comparison
 from ml.cfr_classifier.examples import Example, document_text
-from ml.cfr_classifier.torch_train import fit_and_score
+from ml.cfr_classifier.torch_train import fit_and_score, prepare_torch
 
 
 @dataclass(frozen=True)
@@ -224,6 +224,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         raise ValueError(f"unknown head {kind}")
 
+    torch_version = prepare_torch()
     try:
         comparison = run_comparison(
             loaded.examples,
@@ -271,9 +272,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif promoted.is_file():
         promoted.unlink()
     payload["artifacts"] = artifacts
-    import torch
-
-    payload["torch_version"] = torch.__version__
+    payload["torch_version"] = torch_version
     write_report(args.report, payload)
     print(args.report)
     return 0

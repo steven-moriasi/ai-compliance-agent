@@ -3,12 +3,13 @@ from typing import Literal
 
 import pytest
 
-from ml.cfr_classifier.torch_train import fit_and_score
+from ml.cfr_classifier.torch_train import fit_and_score, prepare_torch
 
 
 @pytest.mark.models
 def test_linear_and_mlp_heads_separate_two_classes(tmp_path: Path) -> None:
     pytest.importorskip("torch")
+    assert prepare_torch()
     train_x = [[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]
     train_y = [[1, 0], [1, 0], [0, 1], [0, 1]]
     test_x = [[1.0, 0.0], [0.0, 1.0]]
