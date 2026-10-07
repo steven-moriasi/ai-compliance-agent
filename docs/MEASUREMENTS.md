@@ -76,6 +76,31 @@ already cached.
 
 The query asked for publications through `2025-12-31`. The loaded documents end on `2024-10-11`.
 
+## PostgreSQL corpus load
+
+Recorded in `evals/reports/federal_register_corpus_postgres.json` at `2026-10-07T10:04:37Z`, git
+`c892e10c4b107d2dc0bd3e8af858f4f29ce5c096`. Elapsed time was 130502 ms. The cache was already on
+disk. The database URL in the report is `postgresql+psycopg://127.0.0.1:5432/compliance`.
+
+| Item | Measured value |
+| --- | --- |
+| Dataset | `840a6be0a156` |
+| Documents fetched | 600 |
+| Inserted / unchanged | 588 / 0 |
+| Dropped for no remaining sections | 12 |
+| Parse failures | 0 |
+| Policies | 588 |
+| Sections | 34174 |
+| Short sections dropped | 1024 |
+| Sections split | 5170 |
+| Residual markup | 0 |
+| Publication dates | `2023-01-04` to `2024-10-11` |
+| Policy status | 588 `ACTIVE` |
+| Cache | 1213814149 bytes, 908 files |
+
+The manifest hash includes the git SHA, so this reload is not dataset `7a9a5318ad2f`. Counts and
+publication dates match that earlier SQLite load.
+
 ## Keyword retrieval
 
 Recorded in `evals/reports/keyword_retrieval.json` at `2026-10-07T08:52:48Z`, git
@@ -92,19 +117,42 @@ One call, `retrieve_policies` for `nitrogen oxides`, keyword mode, as of `2026-1
 | First section | `preamble:summary` |
 | First lexical score | 1.0 |
 
-This is one SQLite observation. It is not a percentile and it was not repeated on PostgreSQL.
+This is one SQLite observation. It is not a percentile. The PostgreSQL timings below repeat keyword
+search on the same corpus shape.
 
 The default `analysis_lease_seconds` in application settings is 120. This query took 124.411
 seconds, so a worker on that default can fail to store a result for this corpus. Raise
 `COMPLIANCE_ANALYSIS_LEASE_SECONDS` from an observed duration. Do not treat 124411 ms as a
 high percentile.
 
+## PostgreSQL retrieval latency
+
+Recorded in `evals/reports/retrieval_latency_2026-10-07.json` at `2026-10-07T10:39:49Z`, git
+`c892e10c4b107d2dc0bd3e8af858f4f29ce5c096`, dataset `840a6be0a156`, as of `2026-10-07`. Queries are
+50 active policy titles drawn with seed 7. Ingestion does not store the Federal Register action
+line, so these are not action-plus-title questions. Keyword mode ran on the first 10 of those
+titles because it still loads every eligible section into Python.
+
+| Mode | Queries | p50 | p95 | max |
+| --- | --- | --- | --- | --- |
+| fulltext | 50 | 4.889549978543073 ms | 131.6251999232918 ms | 193.29730002209544 ms |
+| keyword | 10 | 34808.43209999148 ms | 40368.222634959966 ms | 41023.53229990695 ms |
+
+Full-text p95 is under one second on this host. Keyword p50 on PostgreSQL is 34808 ms, which
+finishes inside the default 120 second lease. The SQLite observation above does not.
+
+The same report records single full-text probes. `NOx` and `nitrogen oxides` returned the same
+first section, `preamble:II.A.1`. `PM2.5` returned `§ 52.1770#5` first. `§ 60.4` returned
+`preamble:III.F` first, at lexical score 0.3, not a section whose reference is `§ 60.4`. The
+stored vector is the heading plus the section text. It does not include the section reference.
+
 ## Not measured
 
 - `evals/reports/local_model.json` does not exist. Generation latency, token counts, and output
   quality for `qwen2.5:3b` were not measured.
 - The retrieval extra was not installed, and no embedding-index report exists. Embedding and hybrid
-  latency were not measured. Keyword mode remains the default.
+  latency were not measured. PostgreSQL defaults to full text. SQLite and the deterministic
+  evaluation corpus stay on keyword overlap.
 - No CFR-part drift report was written. The 0.25 population-stability cutoff in code is a check
   threshold, not a measured shift on this corpus.
 - The disk-free figure above is the 2026-10-06 snapshot. It does not include later cache growth.

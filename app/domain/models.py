@@ -56,7 +56,7 @@ class Policy(Base):
     docket_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     effective_date_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     dataset_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    correction_of: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    correction_of: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     sections: Mapped[list["PolicySection"]] = relationship(

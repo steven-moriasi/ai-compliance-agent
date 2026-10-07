@@ -7,7 +7,7 @@ from threading import Barrier
 
 import httpx
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.schema import CreateSchema, DropSchema
 
@@ -46,6 +46,18 @@ def postgres_session_factory() -> Generator[sessionmaker[Session], None, None]:
         execution_options={"schema_translate_map": {None: schema}},
     )
     Base.metadata.create_all(test_engine)
+    with test_engine.begin() as connection:
+        connection.execute(
+            text(
+                f'''
+                ALTER TABLE "{schema}".policy_sections
+                ADD COLUMN search_vector tsvector
+                GENERATED ALWAYS AS (
+                    to_tsvector('english', coalesce(heading, '') || ' ' || text)
+                ) STORED
+                '''
+            )
+        )
     factory = sessionmaker(bind=test_engine, expire_on_commit=False)
     try:
         yield factory

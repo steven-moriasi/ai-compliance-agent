@@ -22,6 +22,16 @@ SYNONYM_GROUPS: tuple[tuple[str, ...], ...] = (
 _COMPACT_FORM = re.compile(r"[a-z0-9.]{3,}")
 
 
+def synonym_phrases(text: str) -> set[str]:
+    """Return every listed form in a group once any one form appears in the text."""
+    folded = re.sub(r"\s+", " ", text.lower())
+    found: set[str] = set()
+    for group in SYNONYM_GROUPS:
+        if any(_form_present(folded, form) for form in group):
+            found.update(group)
+    return found
+
+
 def expand_tokens(text: str, tokens: set[str]) -> set[str]:
     """Add every form in a group once any one form is present in the text."""
     expanded = set(tokens)

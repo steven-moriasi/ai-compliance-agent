@@ -54,7 +54,7 @@ spec:
         fsGroup: 999
       containers:
         - name: postgres
-          image: postgres:17.5-bookworm
+          image: pgvector/pgvector:pg17
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres

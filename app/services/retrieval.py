@@ -22,7 +22,7 @@ from app.services.embeddings import (
 TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
 RRF_K = 60
 PRIOR_WEIGHT = 0.05
-RetrievalMode = Literal["keyword", "embedding", "hybrid"]
+RetrievalMode = Literal["keyword", "fulltext", "embedding", "hybrid"]
 
 
 @dataclass(frozen=True)
@@ -61,17 +61,36 @@ def _tokens(value: str) -> set[str]:
     return expand_tokens(value, set(TOKEN_PATTERN.findall(value.lower())))
 
 
+def resolve_retrieval_mode(requested: RetrievalMode | None, dialect: str) -> RetrievalMode:
+    """PostgreSQL defaults to full text. SQLite and explicit keyword stay on the Python scan."""
+    if requested is not None:
+        return requested
+    if dialect == "postgresql":
+        return "fulltext"
+    return "keyword"
+
+
 def retrieve_policies(
     session: Session,
     document: str,
     case_date: date,
     limit: int = 5,
     *,
-    mode: RetrievalMode = "keyword",
+    mode: RetrievalMode | None = None,
     embedder: Embedder | None = None,
     embedding_index: Mapping[str, Sequence[float]] | None = None,
     cfr_prior: CfrPrior | None = None,
 ) -> list[RetrievedPolicy]:
+    bind = session.get_bind()
+    dialect = bind.dialect.name if bind is not None else "sqlite"
+    selected = resolve_retrieval_mode(mode, dialect)
+    if selected == "fulltext":
+        if dialect != "postgresql":
+            raise RetrievalUnavailable("full-text retrieval requires PostgreSQL")
+        from app.services.fulltext import retrieve_fulltext
+
+        predictions = predict_cfr_parts(cfr_prior, document) if cfr_prior is not None else {}
+        return retrieve_fulltext(session, document, case_date, limit, predictions)
     document_tokens = _tokens(document)
     predictions = predict_cfr_parts(cfr_prior, document) if cfr_prior is not None else {}
     candidates = _eligible_sections(session, case_date)
@@ -85,12 +104,12 @@ def retrieve_policies(
         )
         for policy, section, body in candidates
     ]
-    if mode == "keyword":
+    if selected == "keyword":
         return _keyword_results(scored, limit, predictions)
     if embedder is None and not embedding_index:
         raise RetrievalUnavailable("embedding or hybrid search needs an embedder or a built index")
     _apply_embedding_scores(document, scored, embedder, embedding_index)
-    if mode == "embedding":
+    if selected == "embedding":
         return _embedding_results(scored, limit, predictions)
     return _hybrid_results(scored, limit, predictions)
 
