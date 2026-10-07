@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.domain.enums import PolicyStatus
 from app.domain.models import Policy, PolicySection
 from app.ingestion.federal_register.synonyms import expand_tokens
+from app.services.classifier import CfrPrior, cfr_labels, predict_cfr_parts
 from app.services.embeddings import (
     Embedder,
     RetrievalUnavailable,
@@ -20,6 +21,7 @@ from app.services.embeddings import (
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
 RRF_K = 60
+PRIOR_WEIGHT = 0.05
 RetrievalMode = Literal["keyword", "embedding", "hybrid"]
 
 
@@ -68,8 +70,10 @@ def retrieve_policies(
     mode: RetrievalMode = "keyword",
     embedder: Embedder | None = None,
     embedding_index: Mapping[str, Sequence[float]] | None = None,
+    cfr_prior: CfrPrior | None = None,
 ) -> list[RetrievedPolicy]:
     document_tokens = _tokens(document)
+    predictions = predict_cfr_parts(cfr_prior, document) if cfr_prior is not None else {}
     candidates = _eligible_sections(session, case_date)
     scored = [
         _ScoredSection(
@@ -82,13 +86,13 @@ def retrieve_policies(
         for policy, section, body in candidates
     ]
     if mode == "keyword":
-        return _keyword_results(scored, limit)
+        return _keyword_results(scored, limit, predictions)
     if embedder is None and not embedding_index:
         raise RetrievalUnavailable("embedding or hybrid search needs an embedder or a built index")
     _apply_embedding_scores(document, scored, embedder, embedding_index)
     if mode == "embedding":
-        return _embedding_results(scored, limit)
-    return _hybrid_results(scored, limit)
+        return _embedding_results(scored, limit, predictions)
+    return _hybrid_results(scored, limit, predictions)
 
 
 def _eligible_sections(
@@ -166,19 +170,37 @@ def _query_vector(
     raise RetrievalUnavailable("embedding or hybrid search needs an embedder or a built index")
 
 
-def _keyword_results(scored: list[_ScoredSection], limit: int) -> list[RetrievedPolicy]:
+def _keyword_results(
+    scored: list[_ScoredSection],
+    limit: int,
+    predictions: Mapping[str, float],
+) -> list[RetrievedPolicy]:
     ranked = [item for item in scored if item.lexical_score > 0]
-    ranked.sort(key=_candidate_order)
-    return [_result(item, item.lexical_score) for item in ranked[:limit]]
+    ranked.sort(key=lambda item: _adjusted_order(item, item.lexical_score, predictions))
+    return [
+        _result(item, item.lexical_score + _prior_adjustment(item, predictions))
+        for item in ranked[:limit]
+    ]
 
 
-def _embedding_results(scored: list[_ScoredSection], limit: int) -> list[RetrievedPolicy]:
+def _embedding_results(
+    scored: list[_ScoredSection],
+    limit: int,
+    predictions: Mapping[str, float],
+) -> list[RetrievedPolicy]:
     ranked = [item for item in scored if item.embedding_score > 0]
-    ranked.sort(key=lambda item: (-item.embedding_score, *_candidate_order(item)[1:]))
-    return [_result(item, item.embedding_score) for item in ranked[:limit]]
+    ranked.sort(key=lambda item: _adjusted_order(item, item.embedding_score, predictions))
+    return [
+        _result(item, item.embedding_score + _prior_adjustment(item, predictions))
+        for item in ranked[:limit]
+    ]
 
 
-def _hybrid_results(scored: list[_ScoredSection], limit: int) -> list[RetrievedPolicy]:
+def _hybrid_results(
+    scored: list[_ScoredSection],
+    limit: int,
+    predictions: Mapping[str, float],
+) -> list[RetrievedPolicy]:
     lexical_ranks = {
         id(item): rank
         for rank, item in enumerate(
@@ -206,9 +228,34 @@ def _hybrid_results(scored: list[_ScoredSection], limit: int) -> list[RetrievedP
         if embedding_rank is not None:
             score += 1 / (RRF_K + embedding_rank)
         if score > 0:
-            fused.append((score, item))
+            fused.append((score + _prior_adjustment(item, predictions), item))
     fused.sort(key=lambda pair: (-pair[0], *_candidate_order(pair[1])[1:]))
     return [_result(item, score) for score, item in fused[:limit]]
+
+
+def _prior_adjustment(item: _ScoredSection, predictions: Mapping[str, float]) -> float:
+    """Bounded rerank among hits that already matched. Missing labels add nothing."""
+    if not predictions:
+        return 0.0
+    labels = cfr_labels(item.policy.cfr_references)
+    if not labels:
+        return 0.0
+    return PRIOR_WEIGHT * max(predictions.get(label, 0.0) for label in labels)
+
+
+def _adjusted_order(
+    item: _ScoredSection,
+    score: float,
+    predictions: Mapping[str, float],
+) -> tuple[float, str, int, int, str]:
+    adjusted = score + _prior_adjustment(item, predictions)
+    return (
+        -adjusted,
+        item.policy.name,
+        -item.policy.version,
+        item.section.position,
+        item.section.section_ref,
+    )
 
 
 def _candidate_order(item: _ScoredSection) -> tuple[float, str, int, int, str]:

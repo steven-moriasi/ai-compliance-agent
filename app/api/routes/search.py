@@ -9,6 +9,7 @@ from app.core.config import Settings, get_settings
 from app.domain.schemas import SearchHit, SearchResponse
 from app.infrastructure.auth import AuthContext, require_roles
 from app.infrastructure.database import get_session
+from app.services.classifier import load_cfr_prior
 from app.services.embeddings import (
     Embedder,
     RetrievalUnavailable,
@@ -60,6 +61,7 @@ def search_sections(
             mode=selected,
             embedder=active_embedder,
             embedding_index=index,
+            cfr_prior=load_cfr_prior(Path(settings.cfr_prior_path)),
         )
     except RetrievalUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

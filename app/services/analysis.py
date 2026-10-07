@@ -11,6 +11,7 @@ from app.domain.enums import AnalysisOutcome, CaseStatus
 from app.domain.models import ComplianceCase
 from app.domain.types import JsonObject
 from app.services.audit import append_audit_event
+from app.services.classifier import CfrPrior
 from app.services.injection import detect_prompt_injection
 from app.services.providers import (
     MalformedModelOutputError,
@@ -37,10 +38,17 @@ class _RowCountResult(Protocol):
 
 
 class AnalysisService:
-    def __init__(self, session: Session, settings: Settings, provider: ModelProvider) -> None:
+    def __init__(
+        self,
+        session: Session,
+        settings: Settings,
+        provider: ModelProvider,
+        cfr_prior: CfrPrior | None = None,
+    ) -> None:
         self.session = session
         self.settings = settings
         self.provider = provider
+        self.cfr_prior = cfr_prior
         self._redaction_count = 0
 
     def analyze(
@@ -55,6 +63,7 @@ class AnalysisService:
             self.session,
             case.document.content,
             case.created_at.date(),
+            cfr_prior=self.cfr_prior,
         )
         injection_signals = detect_prompt_injection(case.document.content)
         if not policies:

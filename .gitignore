@@ -13,6 +13,7 @@ data/raw/
 data/staging/
 data/quality/
 data/embeddings/
+data/models/
 mlruns/
 .cache/
 *.safetensors

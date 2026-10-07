@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     retrieval_mode: Literal["keyword", "embedding", "hybrid"] = "keyword"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_index_path: str = "data/embeddings/sections.json"
+    cfr_prior_path: str = "data/models/cfr_prior.json"
 
 
 @lru_cache
