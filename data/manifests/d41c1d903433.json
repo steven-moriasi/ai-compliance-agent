@@ -1,0 +1,145 @@
+{
+  "created_at": "2026-10-06T22:55:42.303618+00:00",
+  "dataset_version": "d41c1d903433",
+  "document_count": 20,
+  "documents": [
+    {
+      "content_sha256": "cfa610520c8ce4157a32008039344953da821be7e15cd792d58cc98987ea769d",
+      "document_number": "2022-28139",
+      "section_count": 35,
+      "source_xml_sha256": "0e5b06ef574d01554678595109a1bae5f6513ee21ac48c5cd4dfa3d40c932b97"
+    },
+    {
+      "content_sha256": "4dc4d4fc22b3065fa2bc9c7810b67e0628f25acb7d532539200ccede1c8dd965",
+      "document_number": "2022-28150",
+      "section_count": 12,
+      "source_xml_sha256": "6030f8960e21608c498b9409f9733aef2b57aabc713cd9cab9bd6304ea01ab49"
+    },
+    {
+      "content_sha256": "8f1ee401fcc7954eb8ec5bf09310cd805b43cb3de45f6085bc5db7fae7285e27",
+      "document_number": "2022-28319",
+      "section_count": 41,
+      "source_xml_sha256": "3fab811b2e62ded044fe9d53ee41f4af9e9c6037156ba242275420586601ee26"
+    },
+    {
+      "content_sha256": "54882059e16302ad564f37fc56a6f6f3d5c4d1abab19e4744c17f1d346c815a1",
+      "document_number": "2022-28611",
+      "section_count": 18,
+      "source_xml_sha256": "5d7f42e69c0569acdac5612221f8b65bbdfb98c2fa057c632e29a9f975f15f5e"
+    },
+    {
+      "content_sha256": "c146e7591a74144602b3e39718d2c28d6683423d5e8e71d1d9ac62d3a5ff278a",
+      "document_number": "2023-00017",
+      "section_count": 25,
+      "source_xml_sha256": "d9c2dfcd8009974967dcada02d645786e4dc88aa212c0b2bdfe19289e4b3df9c"
+    },
+    {
+      "content_sha256": "2319ffadaf52ccc3b2348b2f25d92df45e6dc4f5da15b0ef648fe5e8fb008612",
+      "document_number": "2022-28278",
+      "section_count": 21,
+      "source_xml_sha256": "97c1f9c8376223dc24a91e81ec407e55a8fb6a628c521285ff1ec2041dc6e3ac"
+    },
+    {
+      "content_sha256": "1cfc395e60596f731c30d11d84900b05aeb68498f8da285f297a8577bbd717ec",
+      "document_number": "2022-28658",
+      "section_count": 10,
+      "source_xml_sha256": "ed2bc7ddace7a6b5b130dbdf1806457dc37ee994764ec1409b40f1198b0d878b"
+    },
+    {
+      "content_sha256": "041217c5a47a8281c65160330a025e6ef35347b54181987952dd2ddac61c40d8",
+      "document_number": "2022-28664",
+      "section_count": 9,
+      "source_xml_sha256": "19d871782957b6e09205aa63fc7f87e5be4a98568b353978cf81ed7b8fb31938"
+    },
+    {
+      "content_sha256": "88b436adeea681328888648676e7861d97f0393ce947aeebb917ce6122580a2f",
+      "document_number": "2022-27871",
+      "section_count": 22,
+      "source_xml_sha256": "06b554239346e05cded75f3421610251f6c818203fd44871bd4b6c72417d3b84"
+    },
+    {
+      "content_sha256": "82cf43909a6f6d4b68f6aa9c5979439ea4941aaaac5d66a52d97e0df91199907",
+      "document_number": "2023-00411",
+      "section_count": 15,
+      "source_xml_sha256": "a5afb82a6e0c15320102c8c1884fc567975f771a7a732337650062bd89e1c263"
+    },
+    {
+      "content_sha256": "99ce9274d6f42e52858e4f57c9bbdf1987f81cd50362ff1305451cf84631303a",
+      "document_number": "2023-00567",
+      "section_count": 20,
+      "source_xml_sha256": "803d68ee78ba96d5a685e08f682b9ab65490f72dd8739468435373259a62dab0"
+    },
+    {
+      "content_sha256": "fdbaf1826452288ab247754859afa501fc1cb2e4d68ac20bda51c0e68c7674ee",
+      "document_number": "2022-28307",
+      "section_count": 21,
+      "source_xml_sha256": "121532fd06d0760317336eae3d9c5e7ff40ca0019793e015d28cdb06ac13c16e"
+    },
+    {
+      "content_sha256": "8781a6b8e65b041a66263d667741d31f42b8384ed28436e41175e1cd6d37a99a",
+      "document_number": "2022-28595",
+      "section_count": 544,
+      "source_xml_sha256": "ecebd5ec6205b442f81f85710de19b0dd32f54171f0f3d1e5b44fb7b2e63858d"
+    },
+    {
+      "content_sha256": "324c42a9a64359d22d244b04bec18a0da99ea39483d4b900c85f430ea62f66b0",
+      "document_number": "2023-00369",
+      "section_count": 21,
+      "source_xml_sha256": "572ce741dab088892295d1e908712ab93ffae2b75b1729461a33ac911f28304a"
+    },
+    {
+      "content_sha256": "4a46174ab79fa016db302d1be925b9d4b38b9a1fa2e454c138262a8362054a4f",
+      "document_number": "2023-00949",
+      "section_count": 21,
+      "source_xml_sha256": "bc744fc8ab5770372d3c4a5a1631ec60f654f99ec577994ff1e0c8e87b157b6f"
+    },
+    {
+      "content_sha256": "e400225c237e9c4202986d59b27716043226dfde9d03e347676c07001e89ddbb",
+      "document_number": "2022-27957",
+      "section_count": 1292,
+      "source_xml_sha256": "203594fd599d067026b2826790431f0c0b3d1038233bd211defb1c96f559aad9"
+    },
+    {
+      "content_sha256": "5d50310272214848ff706dd6f2dfda989915c4f496ad3fbc2dfb2e78f4ea6c03",
+      "document_number": "2023-01131",
+      "section_count": 20,
+      "source_xml_sha256": "5402bbb34b55fd9bfcfeab3548ae74686c8708f88d2f19ee1431087a0d9a351e"
+    },
+    {
+      "content_sha256": "04bbcc79c1bf7dd10dfc9728f38733efcb1b9d27821b1c8070872741a6ca82fe",
+      "document_number": "2023-01155",
+      "section_count": 22,
+      "source_xml_sha256": "e7e378f4b702182aecbaf5d4c9acc74b884b434e26bbca54ee55e963a4f15356"
+    },
+    {
+      "content_sha256": "d766d253cf7f7d049ab4e84bbf7fa163ebbab7e47889c274dc037d78c97b0339",
+      "document_number": "2023-01503",
+      "section_count": 2,
+      "source_xml_sha256": "f927adc1d4705bd5d960c1b3ca0dbe596a12bf1c51df7db0044e7fb2b17ffbdf"
+    },
+    {
+      "content_sha256": "fba03813f962a03d592692d88ae6fc717ab4b4fa6b666c4121d7d5a6f2d84bb1",
+      "document_number": "2023-01505",
+      "section_count": 6,
+      "source_xml_sha256": "d47ae5de37f109886859edb6f0c506d3321799060ef4133bbce265adff618a9c"
+    }
+  ],
+  "files": [
+    {
+      "path": "data/staging/14266601-6127-4922-9f11-6b3424685de3/sections.jsonl",
+      "sha256": "456b681705de3b13b42cae41aac3761b7305b4052be06d5a200f249aeb996a1a"
+    }
+  ],
+  "git_sha": "c164656aa42bdc74c0719ea1130eb0be5f3d1fee",
+  "query": {
+    "agency": "environmental-protection-agency",
+    "cfr_title": 40,
+    "document_type": "RULE",
+    "incremental": false,
+    "max_documents": 20,
+    "since": "2023-01-01",
+    "until": "2025-12-31"
+  },
+  "section_count": 2177,
+  "source": "federal_register"
+}

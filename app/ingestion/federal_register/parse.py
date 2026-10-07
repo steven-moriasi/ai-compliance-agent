@@ -13,7 +13,7 @@ from defusedxml.common import DefusedXmlException  # type: ignore[import-untyped
 from defusedxml.ElementTree import fromstring  # type: ignore[import-untyped]
 
 from app.ingestion.federal_register.normalize import format_subscript, normalize_text
-from app.ingestion.federal_register.records import ParsedSection
+from app.ingestion.federal_register.records import ParsedSection, fit_ref
 
 _DOCUMENT_TAGS = {"RULE", "PRORULE", "NOTICE"}
 _FRONT_MATTER = {
@@ -294,6 +294,12 @@ def _unique_refs(sections: list[ParsedSection]) -> list[ParsedSection]:
     for section in sections:
         seen[section.section_ref] = seen.get(section.section_ref, 0) + 1
         count = seen[section.section_ref]
-        ref = section.section_ref if count == 1 else f"{section.section_ref}~{count}"
-        unique.append(ParsedSection(ref[:120], section.heading, section.paragraphs))
+        suffix = "" if count == 1 else f"~{count}"
+        unique.append(
+            ParsedSection(
+                fit_ref(section.section_ref, suffix),
+                section.heading,
+                section.paragraphs,
+            )
+        )
     return unique

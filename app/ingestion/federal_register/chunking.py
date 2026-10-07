@@ -8,7 +8,7 @@ boundary can still be found in one stored section.
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from app.ingestion.federal_register.records import ParsedSection
+from app.ingestion.federal_register.records import ParsedSection, fit_ref
 
 MAX_SECTION_WORDS = 350
 MIN_CHUNK_WORDS = 250
@@ -39,10 +39,10 @@ def prepare_sections(
         if len(parts) > 1:
             split += 1
         for index, text in enumerate(parts):
-            ref = section.section_ref if index == 0 else f"{section.section_ref}#{index + 1}"
+            suffix = "" if index == 0 else f"#{index + 1}"
             kept.append(
                 SectionChunk(
-                    section_ref=ref[:120],
+                    section_ref=fit_ref(section.section_ref, suffix),
                     heading=section.heading,
                     text=text,
                     position=len(kept),

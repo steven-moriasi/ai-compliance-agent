@@ -242,6 +242,18 @@ def test_long_sections_split_on_paragraphs_with_overlap() -> None:
     assert chunks[1].text.startswith(overlap)
 
 
+def test_split_long_refs_stay_unique_within_storage_limit() -> None:
+    paragraph = " ".join(f"word{index}" for index in range(100))
+    section = ParsedSection("preamble:" + ("detail-" * 20), "Heading", (paragraph,) * 4)
+    chunks, _dropped, split = prepare_sections([section])
+    refs = [chunk.section_ref for chunk in chunks]
+    assert split == 1
+    assert len(refs) > 1
+    assert len(refs) == len(set(refs))
+    assert all(len(ref) <= 120 for ref in refs)
+    assert refs[1].endswith("#2")
+
+
 def test_short_sections_are_dropped() -> None:
     chunks, dropped, _split = prepare_sections([ParsedSection("§ 1.1", None, ("too short",))])
     assert dropped == 1

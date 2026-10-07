@@ -4,6 +4,13 @@ from datetime import date
 from app.domain.types import JsonObject
 
 
+def fit_ref(base: str, suffix: str = "", *, limit: int = 120) -> str:
+    """Keep a section reference within the stored length without losing its suffix."""
+    if len(suffix) >= limit:
+        return suffix[-limit:]
+    return base[: limit - len(suffix)] + suffix
+
+
 @dataclass(frozen=True)
 class ParsedSection:
     section_ref: str
