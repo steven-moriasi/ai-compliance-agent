@@ -1,0 +1,18 @@
+{
+  "recorded_at": "2026-10-07T08:52:48.467091+00:00",
+  "git_sha": "89d559fb2dbc3b5a2fd2cecef4a81e760ca9d6e6",
+  "database": "sqlite:///./compliance.db",
+  "command": "retrieve_policies(session, 'nitrogen oxides', date(2026, 10, 7), limit=5, mode='keyword')",
+  "sections": 34174,
+  "active_policies": 588,
+  "query": "nitrogen oxides",
+  "mode": "keyword",
+  "as_of": "2026-10-07",
+  "limit": 5,
+  "elapsed_ms": 124411,
+  "hit_count": 5,
+  "first_policy_id": "8931241c-72e8-438b-ae70-11534bc3c4ea",
+  "first_section_ref": "preamble:summary",
+  "first_lexical_score": 1.0,
+  "note": "One SQLite keyword query. Not a percentile and not a PostgreSQL measurement."
+}

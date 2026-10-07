@@ -142,7 +142,7 @@ Do not manually mark a case approved or bypass review to clear a queue.
 1. Confirm worker processes are not restarting or being terminated.
 2. Check provider latency and network timeouts.
 3. Confirm host clocks are synchronized.
-4. Compare `analysis_lease_seconds` with observed high-percentile analysis duration.
+4. Compare `analysis_lease_seconds` with observed analysis duration. One SQLite keyword query over the loaded corpus took 124411 ms (`evals/reports/keyword_retrieval.json`). The default lease is 120 seconds, so that query does not finish inside the default lease. That file is one observation, not a percentile.
 5. Inspect attempt counts and preserve exhausted cases as evidence.
 6. Submit a new case only after correcting the underlying condition.
 

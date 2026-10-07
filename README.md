@@ -253,6 +253,10 @@ expected retrieved sources, validation findings, workflow status, provider attem
 events. Add a sanitized case whenever retrieval, validation, retry, or failure behavior changes.
 The corpus uses SQLite and local fixtures; it makes no network calls.
 
+Host, Federal Register, and keyword-retrieval figures are recorded in
+[docs/MEASUREMENTS.md](docs/MEASUREMENTS.md). That page quotes `evals/reports/` and does not fill
+gaps where a report was not written.
+
 Run the PostgreSQL-only evidence against a disposable database:
 
 ```bash
