@@ -67,5 +67,14 @@ services:
       COMPLIANCE_NOTIFICATION_WEBHOOK_URL: ${COMPLIANCE_NOTIFICATION_WEBHOOK_URL:-}
       COMPLIANCE_NOTIFICATION_WEBHOOK_SECRET: ${COMPLIANCE_NOTIFICATION_WEBHOOK_SECRET:-}
 
+  ollama:
+    image: ollama/ollama:0.12.6
+    profiles: ["local-model"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+
 volumes:
   compliance-data:
+  ollama-models:

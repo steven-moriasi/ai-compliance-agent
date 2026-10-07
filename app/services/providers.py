@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from time import monotonic
-from typing import Protocol
+from typing import Literal, Protocol
 
 import httpx
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -107,11 +107,17 @@ class OpenAICompatibleProvider:
         api_key: str,
         model: str,
         client: httpx.Client | None = None,
+        provider_name: str = "openai-compatible",
+        json_mode: Literal["json_schema", "json_object"] = "json_schema",
+        timeout_seconds: float = 30,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.client = client
+        self.name = provider_name
+        self.json_mode = json_mode
+        self.timeout_seconds = timeout_seconds
 
     def analyze(self, request: ModelRequest) -> ModelResponse:
         started = monotonic()
@@ -137,26 +143,35 @@ class OpenAICompatibleProvider:
                 "every validation feedback item."
             )
             user_request["validation_feedback"] = list(request.validation_feedback)
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": request.system_prompt},
-                {
-                    "role": "user",
-                    "content": json.dumps(user_request),
-                },
-            ],
-            "response_format": {
+        system_prompt = request.system_prompt
+        if self.json_mode == "json_object":
+            system_prompt = (
+                f"{system_prompt}\n\nRespond with one JSON object matching this schema:\n"
+                f"{json.dumps(ModelAnalysis.model_json_schema())}"
+            )
+            response_format: dict[str, object] = {"type": "json_object"}
+        else:
+            response_format = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": "compliance_analysis",
                     "strict": True,
                     "schema": ModelAnalysis.model_json_schema(),
                 },
-            },
+            }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": json.dumps(user_request),
+                },
+            ],
+            "response_format": response_format,
         }
         if self.client is None:
-            with httpx.Client(timeout=30) as client:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
                 response = client.post(
                     f"{self.base_url}/chat/completions",
                     headers={"Authorization": f"Bearer {self.api_key}"},
@@ -173,7 +188,9 @@ class OpenAICompatibleProvider:
         if not completion.choices:
             raise MalformedModelOutputError("Model provider returned no choices")
         try:
-            analysis = ModelAnalysis.model_validate_json(completion.choices[0].message.content)
+            analysis = ModelAnalysis.model_validate_json(
+                _json_object_text(completion.choices[0].message.content)
+            )
         except ValidationError as error:
             raise MalformedModelOutputError("Model output did not match the schema") from error
         return ModelResponse(
@@ -182,3 +199,15 @@ class OpenAICompatibleProvider:
             output_tokens=completion.usage.completion_tokens,
             latency_ms=max(round((monotonic() - started) * 1000), 1),
         )
+
+
+def _json_object_text(content: str) -> str:
+    text = content.strip()
+    if not text.startswith("```"):
+        return text
+    lines = text.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()

@@ -43,6 +43,7 @@ testpaths = ["tests"]
 addopts = "-q --strict-markers --disable-warnings"
 markers = [
     "postgres: tests that require COMPLIANCE_TEST_DATABASE_URL and PostgreSQL",
+    "local_model: tests that call a running local model server",
 ]
 
 [tool.ruff]
