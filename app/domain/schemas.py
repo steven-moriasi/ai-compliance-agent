@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -169,6 +169,28 @@ class ReviewRead(ReviewCreate):
     reviewer_id: str
     analysis_hash: str
     created_at: datetime
+
+
+class SearchHit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    policy_id: str
+    name: str
+    version: int
+    section_ref: str
+    heading: str | None
+    content: str
+    score: float
+    lexical_score: float
+    embedding_score: float
+
+
+class SearchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["keyword", "embedding", "hybrid"]
+    as_of: date
+    results: list[SearchHit]
 
 
 class AuditEventRead(BaseModel):

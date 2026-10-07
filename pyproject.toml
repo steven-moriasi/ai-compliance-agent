@@ -30,6 +30,10 @@ dev = [
     "pytest-cov==7.1.0",
     "ruff==0.16.6",
 ]
+retrieval = [
+    "sentence-transformers==6.1.0",
+    "torch==2.14.1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

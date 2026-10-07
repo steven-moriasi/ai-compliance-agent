@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     notification_max_attempts: int = Field(default=5, ge=1, le=20)
     ingest_contact: str = "local-development"
     ingest_cache_dir: str = "data/raw/federal_register"
+    retrieval_mode: Literal["keyword", "embedding", "hybrid"] = "keyword"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_index_path: str = "data/embeddings/sections.json"
 
 
 @lru_cache
