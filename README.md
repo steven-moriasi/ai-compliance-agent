@@ -134,6 +134,12 @@ hybrid is in `evals/reports/retrieval_eval_2026-10-07.json` and
 [ADR 008](docs/adr/008-hybrid-retrieval-default.md). Keyword search on the same database is
 still the slow baseline.
 
+The CFR-part comparison on that dataset is `evals/reports/cfr_classifier_2026-10-07.json`.
+On 99 held-out documents the MLP top-1 hit rate is 0.8383838383838383, the same as naive Bayes
+and below TF-IDF logistic regression at 0.8484848484848485. Gold population stability is
+0.6884761992732462. The promotion gate refused the MLP
+([ADR 009](docs/adr/009-cfr-classifier-not-promoted.md)).
+
 Stop the stack:
 
 ```bash

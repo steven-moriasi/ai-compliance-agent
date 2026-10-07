@@ -11,9 +11,11 @@ are ordered by risk reduction rather than feature volume.
   jurisdiction, regulated-entity profile, or transitional-rule model.
 - Effective windows are filtered but overlapping active versions and conflicting sections are not
   rejected automatically.
-- Hybrid retrieval is measured on a document set and a curated set. It is not a legal-expert
-  judgment, and the section-level question set is not built yet. Exact-quote checks still do not
-  prove regulatory correctness.
+- Hybrid retrieval is measured on a document set and a curated set. The section-level question
+  set is not built yet. Exact-quote checks still do not prove regulatory correctness.
+- A PyTorch CFR-part MLP was scored against majority, naive Bayes, and TF-IDF logistic
+  regression on a 2024-07-01 split. The promotion gate refused it. The score does not approve
+  or reject a case. See [ADR 009](adr/009-cfr-classifier-not-promoted.md).
 - The deterministic corpus proves application behavior against synthetic fixtures; it is not a
   legal-expert benchmark and does not measure live-provider quality.
 - PostgreSQL concurrency tests cover claiming, fencing, and notification reclaim, but not sustained

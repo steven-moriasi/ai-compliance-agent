@@ -1,0 +1,152 @@
+{
+  "artifacts": {
+    "mlp_sha256": "35b00060b5b0069fea52d3a907e3d91c690f29e82b5db522d760af33d6d62d70",
+    "promoted": false,
+    "promoted_path": "data/models/cfr_mlp.promoted.safetensors",
+    "tfidf_logreg_sha256": "c38020155846b9a8a6f7a28435b26848e32c32fe57eb17b9a17b9b40ddf969d0"
+  },
+  "command": "py -3 -m ml.cfr_classifier.train --cutoff 2024-07-01 --min-label-support 5 --text-limit 4000 --max-terms 2000 --min-df 3 --epochs 40 --hidden 64 --learning-rate 0.001 --weight-decay 0.0001 --seed 7 --artifact-dir data\\models --report evals\\reports\\cfr_classifier_2026-10-07.json",
+  "cutoff": "2024-07-01",
+  "database": "postgresql+psycopg://127.0.0.1:5432/compliance",
+  "dataset_versions": {
+    "840a6be0a156": 588
+  },
+  "documents_loaded": 588,
+  "drift": {
+    "gold_drifted": true,
+    "gold_population_stability": 0.6884761992732462,
+    "pca": {
+      "component_shifts": [
+        -0.004056276957881616,
+        -0.013477327087276753
+      ],
+      "components": 2,
+      "explained_variance_ratio": [
+        0.1557835877068428,
+        0.02764487295965721
+      ],
+      "l2_mean_shift": 0.141372630378354,
+      "power_iterations": 30
+    },
+    "threshold": 0.25
+  },
+  "dropped_test_documents": 15,
+  "dropped_train_documents": 65,
+  "git_sha": "fef5cea5bd6135ee49abcddb263065403c7ee054",
+  "hardware": {
+    "cpu": "Intel64 Family 6 Model 126 Stepping 5, GenuineIntel",
+    "cpu_count": 8,
+    "gpu": null,
+    "machine": "AMD64",
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.7",
+    "ram_bytes": 16745918464
+  },
+  "label_support_test": {
+    "40:174": 2,
+    "40:180": 21,
+    "40:271": 6,
+    "40:300": 2,
+    "40:52": 52,
+    "40:60": 5,
+    "40:62": 1,
+    "40:63": 5,
+    "40:70": 3,
+    "40:81": 6
+  },
+  "label_support_train": {
+    "40:1037": 5,
+    "40:174": 6,
+    "40:180": 93,
+    "40:271": 7,
+    "40:300": 8,
+    "40:372": 5,
+    "40:52": 231,
+    "40:60": 20,
+    "40:62": 7,
+    "40:63": 18,
+    "40:70": 6,
+    "40:721": 5,
+    "40:81": 11,
+    "40:86": 5,
+    "40:9": 7
+  },
+  "labels": [
+    "40:1037",
+    "40:174",
+    "40:180",
+    "40:271",
+    "40:300",
+    "40:372",
+    "40:52",
+    "40:60",
+    "40:62",
+    "40:63",
+    "40:70",
+    "40:721",
+    "40:81",
+    "40:86",
+    "40:9"
+  ],
+  "max_terms": 2000,
+  "min_df": 3,
+  "min_label_support": 5,
+  "models": {
+    "majority": {
+      "elapsed_seconds": 0.00013399997260421515,
+      "recall_at_3": 0.7676767676767676,
+      "top1_hit_rate": 0.5252525252525253
+    },
+    "mlp": {
+      "elapsed_seconds": 0.37268259993288666,
+      "recall_at_3": 0.9090909090909091,
+      "top1_hit_rate": 0.8383838383838383
+    },
+    "naive_bayes": {
+      "elapsed_seconds": 1.6352010000264272,
+      "recall_at_3": 0.9494949494949495,
+      "top1_hit_rate": 0.8383838383838383
+    },
+    "tfidf_logreg": {
+      "elapsed_seconds": 2.522956599947065,
+      "recall_at_3": 0.9595959595959596,
+      "top1_hit_rate": 0.8484848484848485
+    }
+  },
+  "promotion": {
+    "baseline": "naive_bayes",
+    "candidate": "mlp",
+    "promoted": false,
+    "reasons": [
+      "mlp recall_at_3 0.9090909090909091 is below naive_bayes 0.9494949494949495",
+      "mlp top1_hit_rate 0.8383838383838383 is below tfidf_logreg 0.8484848484848485",
+      "mlp recall_at_3 0.9090909090909091 is below tfidf_logreg 0.9595959595959596",
+      "gold population stability 0.6884761992732462 is above the cutoff 0.25"
+    ]
+  },
+  "recorded_at": "2026-10-07T15:03:19.668283+00:00",
+  "skipped_without_date": 0,
+  "skipped_without_labels": 0,
+  "skipped_without_text": 0,
+  "status": "scored",
+  "test_documents": 99,
+  "text": {
+    "content_limit_chars": 4000,
+    "fields": "title plus content prefix",
+    "naive_bayes_tokenizer": "the retrieval prior's synonym-expanded token set",
+    "tokenizer": "lowercase tokens of three or more letters or digits, no synonym expansion"
+  },
+  "torch_version": "2.14.1+cpu",
+  "train_documents": 409,
+  "training": {
+    "epochs": 40,
+    "hidden": 64,
+    "learning_rate": 0.001,
+    "loss": "BCEWithLogitsLoss",
+    "mlp": "linear, relu, dropout 0.1, linear",
+    "pos_weight_cap": 20,
+    "seed": 7,
+    "weight_decay": 0.0001
+  },
+  "vocabulary_size": 2000
+}

@@ -198,14 +198,39 @@ Full text returned hits for 0 of 4 negative curated queries. Vector, hybrid, hyb
 prior, and keyword returned hits for all 4. The prior does not move curated MRR@10 by more than
 0.002. [ADR 008](adr/008-hybrid-retrieval-default.md) keeps it off the default path.
 
+## CFR-part classifiers
+
+Recorded in `evals/reports/cfr_classifier_2026-10-07.json` at `2026-10-07T15:03:19Z`, git
+`fef5cea5bd6135ee49abcddb263065403c7ee054`, dataset `840a6be0a156`, torch `2.14.1+cpu`. Command:
+
+`py -3 -m ml.cfr_classifier.train --cutoff 2024-07-01 --min-label-support 5 --text-limit 4000 --max-terms 2000 --min-df 3 --epochs 40 --hidden 64 --learning-rate 0.001 --weight-decay 0.0001 --seed 7 --artifact-dir data\models --report evals\reports\cfr_classifier_2026-10-07.json`
+
+The database URL came from `COMPLIANCE_DATABASE_URL`. The report stores
+`postgresql+psycopg://127.0.0.1:5432/compliance` with the userinfo removed. Text is the title
+plus the first 4000 characters. Torch heads use raw tokens. Naive Bayes uses the synonym-expanded
+token set. 588 documents were loaded. After dropping labels with fewer than five training
+documents, 409 train and 99 test remained. 65 train and 15 test documents were dropped.
+
+| Model | Top-1 hit rate | Recall@3 | Elapsed seconds |
+| --- | --- | --- | --- |
+| majority | 0.5252525252525253 | 0.7676767676767676 | 0.00013399997260421515 |
+| naive Bayes | 0.8383838383838383 | 0.9494949494949495 | 1.6352010000264272 |
+| TF-IDF logistic regression | 0.8484848484848485 | 0.9595959595959596 | 2.522956599947065 |
+| MLP | 0.8383838383838383 | 0.9090909090909091 | 0.37268259993288666 |
+
+Logistic regression ran before the MLP, so its elapsed time includes first-use CPU work after
+the torch import. The MLP ties naive Bayes on top-1 and is lower on Recall@3. Logistic regression
+is ahead of both. Gold population stability is 0.6884761992732462, above the 0.25 cutoff, so the
+report marks the label mix as drifted. PCA L2 mean shift is 0.141372630378354. The promotion
+gate refused the MLP. [ADR 009](adr/009-cfr-classifier-not-promoted.md) leaves it out of review
+and out of default retrieval. Weights remain in gitignored `data/models/`.
+
 ## Not measured
 
 - `evals/reports/local_model.json` does not exist. Generation latency, token counts, and output
   quality for `qwen2.5:3b` were not measured.
 - No section-level question set was scored. Building it requires the local model to paraphrase
   sections without copying long spans.
-- No CFR-part drift report was written. The 0.25 population-stability cutoff in code is a check
-  threshold, not a measured shift on this corpus.
 - The disk-free figure above is the 2026-10-06 snapshot. It does not include later cache growth.
 - Coverage percentages from local test runs are not in `evals/reports/`. The CI gate is 85%
   coverage. That gate does not measure retrieval quality or legal correctness.
