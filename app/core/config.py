@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     confidence_threshold: float = Field(default=0.7, ge=0, le=1)
     max_document_bytes: int = Field(default=262144, ge=1024, le=10485760)
     analysis_lease_seconds: int = Field(default=120, ge=30, le=3600)
+    lease_renewal_seconds: int | None = Field(default=None, ge=1, le=1200)
     analysis_max_attempts: int = Field(default=3, ge=1, le=10)
     notification_webhook_url: str | None = None
     notification_webhook_secret: SecretStr | None = None
@@ -33,9 +34,9 @@ class Settings(BaseSettings):
     notification_max_attempts: int = Field(default=5, ge=1, le=20)
     ingest_contact: str = "local-development"
     ingest_cache_dir: str = "data/raw/federal_register"
-    retrieval_mode: Literal["keyword", "embedding", "hybrid"] = "keyword"
+    retrieval_mode: Literal["keyword", "fulltext", "vector", "embedding", "hybrid"] | None = None
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_index_path: str = "data/embeddings/sections.json"
+    embedding_revision: str = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
     cfr_prior_path: str = "data/models/cfr_prior.json"
 
 

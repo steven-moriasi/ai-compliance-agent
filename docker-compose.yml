@@ -15,11 +15,13 @@ x-application: &application
 
 services:
   postgres:
-    image: postgres:17.5-bookworm
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_DB: compliance
       POSTGRES_USER: compliance
       POSTGRES_PASSWORD: compliance
+    ports:
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U compliance -d compliance"]
       interval: 5s

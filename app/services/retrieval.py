@@ -22,7 +22,7 @@ from app.services.embeddings import (
 TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
 RRF_K = 60
 PRIOR_WEIGHT = 0.05
-RetrievalMode = Literal["keyword", "embedding", "hybrid"]
+RetrievalMode = Literal["keyword", "fulltext", "vector", "embedding", "hybrid"]
 
 
 @dataclass(frozen=True)
@@ -54,11 +54,26 @@ class RetrievedPolicy:
     score: float
     lexical_score: float = 0.0
     embedding_score: float = 0.0
+    section_id: str = ""
+    document_number: str | None = None
 
 
 def _tokens(value: str) -> set[str]:
     """Token overlap stays lexical. Listed abbreviations add tokens only when a form is present."""
     return expand_tokens(value, set(TOKEN_PATTERN.findall(value.lower())))
+
+
+def resolve_retrieval_mode(requested: RetrievalMode | None, dialect: str) -> RetrievalMode:
+    """PostgreSQL defaults to hybrid. SQLite and explicit keyword stay on the Python scan.
+
+    The default is the mode that won the curated set in
+    `evals/reports/retrieval_eval_2026-10-07.json`. Full text remains available by name.
+    """
+    if requested is not None:
+        return requested
+    if dialect == "postgresql":
+        return "hybrid"
+    return "keyword"
 
 
 def retrieve_policies(
@@ -67,11 +82,36 @@ def retrieve_policies(
     case_date: date,
     limit: int = 5,
     *,
-    mode: RetrievalMode = "keyword",
+    mode: RetrievalMode | None = None,
     embedder: Embedder | None = None,
     embedding_index: Mapping[str, Sequence[float]] | None = None,
+    embedding_model_id: str | None = None,
     cfr_prior: CfrPrior | None = None,
 ) -> list[RetrievedPolicy]:
+    bind = session.get_bind()
+    dialect = bind.dialect.name if bind is not None else "sqlite"
+    selected = resolve_retrieval_mode(mode, dialect)
+    if selected in {"vector", "embedding", "hybrid"} and dialect == "postgresql":
+        from app.services.vectors import retrieve_semantic
+
+        predictions = predict_cfr_parts(cfr_prior, document) if cfr_prior is not None else {}
+        return retrieve_semantic(
+            session,
+            document,
+            case_date,
+            limit,
+            predictions,
+            mode=selected,
+            embedder=embedder,
+            model_id=embedding_model_id or "",
+        )
+    if selected == "fulltext":
+        if dialect != "postgresql":
+            raise RetrievalUnavailable("full-text retrieval requires PostgreSQL")
+        from app.services.fulltext import retrieve_fulltext
+
+        predictions = predict_cfr_parts(cfr_prior, document) if cfr_prior is not None else {}
+        return retrieve_fulltext(session, document, case_date, limit, predictions)
     document_tokens = _tokens(document)
     predictions = predict_cfr_parts(cfr_prior, document) if cfr_prior is not None else {}
     candidates = _eligible_sections(session, case_date)
@@ -85,12 +125,12 @@ def retrieve_policies(
         )
         for policy, section, body in candidates
     ]
-    if mode == "keyword":
+    if selected == "keyword":
         return _keyword_results(scored, limit, predictions)
     if embedder is None and not embedding_index:
         raise RetrievalUnavailable("embedding or hybrid search needs an embedder or a built index")
     _apply_embedding_scores(document, scored, embedder, embedding_index)
-    if mode == "embedding":
+    if selected == "embedding":
         return _embedding_results(scored, limit, predictions)
     return _hybrid_results(scored, limit, predictions)
 
@@ -280,4 +320,6 @@ def _result(item: _ScoredSection, score: float) -> RetrievedPolicy:
         score=score,
         lexical_score=item.lexical_score,
         embedding_score=item.embedding_score,
+        section_id=item.section.id if isinstance(item.section, PolicySection) else "",
+        document_number=item.policy.document_number,
     )

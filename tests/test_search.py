@@ -1,17 +1,15 @@
 import importlib.util
 from datetime import date
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.routes.search import get_embedder
 from app.main import app
 from app.services.embeddings import (
     RetrievalUnavailable,
-    build_embedding_index,
-    read_embedding_index,
+    cosine,
+    embedding_model_id,
     sentence_transformer_embedder,
 )
 
@@ -121,54 +119,36 @@ def test_hybrid_search_uses_an_injected_embedder(
     ]
 
 
-def test_embedding_index_round_trip(
-    session_factory: sessionmaker[Session],
-    tmp_path: Path,
-) -> None:
-    from app.domain.enums import PolicyStatus
-    from app.domain.models import Policy, PolicySection
-
-    path = tmp_path / "sections.json"
-    with session_factory() as session:
-        session.add(
-            Policy(
-                id="policy-one",
-                name="indexed-rule",
-                version=1,
-                status=PolicyStatus.ACTIVE,
-                content="Nitrogen oxides remain regulated.",
-                content_hash="abc",
-                created_by="test",
-                sections=[
-                    PolicySection(
-                        section_ref="1",
-                        heading=None,
-                        text="Nitrogen oxides remain regulated.",
-                        position=0,
-                    )
-                ],
-            )
-        )
-        session.commit()
-
-        class _FixedEmbedder:
-            def embed(self, texts: list[str]) -> list[tuple[float, ...]]:
-                return [(1.0, 0.0) for _text in texts]
-
-        count = build_embedding_index(session, _FixedEmbedder(), path, "test-model")
-
-    model_name, vectors = read_embedding_index(path)
-    assert count == 1
-    assert model_name == "test-model"
-    assert len(vectors) == 1
-    assert next(iter(vectors.values())) == (1.0, 0.0)
+def test_embedding_identity_keeps_the_revision_and_cosine_is_ranked() -> None:
+    assert embedding_model_id("sentence-transformers/all-MiniLM-L6-v2", "abc") == (
+        "sentence-transformers/all-MiniLM-L6-v2@abc"
+    )
+    assert cosine((1.0, 0.0), (1.0, 0.0)) == 1.0
+    assert cosine((1.0, 0.0), (0.0, 1.0)) == 0.0
 
 
-def test_missing_sentence_transformers_is_reported() -> None:
-    if importlib.util.find_spec("sentence_transformers") is not None:
-        pytest.skip("optional retrieval extra is installed")
+def test_missing_sentence_transformers_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
     with pytest.raises(RetrievalUnavailable, match="retrieval extra"):
         sentence_transformer_embedder("sentence-transformers/all-MiniLM-L6-v2")
+
+
+def test_embedder_reports_truncation_and_float_vectors() -> None:
+    from app.services.embeddings import SentenceTransformerEmbedder
+
+    class _Model:
+        max_seq_length = 4
+
+        def encode(self, texts: list[str], **_kwargs: object) -> list[list[float]]:
+            return [[1.0, 0.0] for _text in texts]
+
+        def tokenizer(self, texts: list[str], **_kwargs: object) -> dict[str, list[list[int]]]:
+            return {"input_ids": [[1, 2, 3, 4, 5], [1, 2]]}
+
+    embedder = SentenceTransformerEmbedder(_Model())
+    assert embedder.truncated(["long", "short"]) == 1
+    assert embedder.embed(["query"]) == [[1.0, 0.0]]
+    assert embedder.max_seq_length == 4
 
 
 def test_search_as_of_defaults_are_not_required_for_keyword(client: TestClient) -> None:

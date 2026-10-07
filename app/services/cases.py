@@ -54,6 +54,38 @@ def claim_next_case(
     return session.get(ComplianceCase, case_id, populate_existing=True)
 
 
+def renew_case_lease(
+    session: Session,
+    case_id: str,
+    worker_id: str,
+    fencing_token: int,
+    lease_seconds: int,
+) -> bool:
+    """Extend a live lease. The fencing token stays put so finalisation still matches it.
+
+    Renewal fails once the lease has expired or another worker has claimed the case.
+    A new token here would make the worker that still holds the old token unable to finish.
+    """
+    now = datetime.now(UTC)
+    renewed = cast(
+        _RowCountResult,
+        session.execute(
+            update(ComplianceCase)
+            .where(
+                ComplianceCase.id == case_id,
+                ComplianceCase.status == CaseStatus.ANALYZING,
+                ComplianceCase.worker_id == worker_id,
+                ComplianceCase.fencing_token == fencing_token,
+                ComplianceCase.lease_expires_at > now,
+            )
+            .values(lease_expires_at=now + timedelta(seconds=lease_seconds))
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    session.commit()
+    return renewed.rowcount == 1
+
+
 def reap_expired_cases(
     session: Session,
     max_attempts: int,

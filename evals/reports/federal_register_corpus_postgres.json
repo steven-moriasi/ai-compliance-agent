@@ -1,0 +1,45 @@
+{
+  "recorded_at": "2026-10-07T10:04:37.693747+00:00",
+  "git_sha": "c892e10c4b107d2dc0bd3e8af858f4f29ce5c096",
+  "command": "py -3 -m app.ingestion.federal_register ingest",
+  "command_elapsed_ms": 130502,
+  "database": "postgresql+psycopg://127.0.0.1:5432/compliance",
+  "hardware": {
+    "cpu": "Intel64 Family 6 Model 126 Stepping 5, GenuineIntel",
+    "cpu_count": 8,
+    "ram_bytes": 16745918464,
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.7",
+    "machine": "AMD64",
+    "gpu": null
+  },
+  "dataset_version": "840a6be0a156",
+  "run_id": "e714c922-6e7b-4902-b303-30c77d4b3406",
+  "query": {
+    "agency": "environmental-protection-agency",
+    "document_type": "RULE",
+    "cfr_title": 40,
+    "since": "2023-01-01",
+    "until": "2025-12-31",
+    "max_documents": 600,
+    "incremental": false
+  },
+  "documents_fetched": 600,
+  "documents_inserted": 588,
+  "documents_unchanged": 0,
+  "documents_without_sections": 12,
+  "parse_failures": 0,
+  "sections": 34174,
+  "policies": 588,
+  "empty_sections_dropped": 1024,
+  "sections_split": 5170,
+  "residual_markup": 0,
+  "publication_date_min": "2023-01-04",
+  "publication_date_max": "2024-10-11",
+  "policy_status_counts": {
+    "ACTIVE": 588
+  },
+  "active_policies": 588,
+  "cache_bytes": 1213814149,
+  "cache_files": 908
+}

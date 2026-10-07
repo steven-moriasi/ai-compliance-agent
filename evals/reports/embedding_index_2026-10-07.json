@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-10-07T12:37:07.284949+00:00",
+  "git_sha": "aa222a341b9dd4171fa5a75d68865c7f0851a6bd",
+  "command": "py -3 -m app.ingestion.embed --model sentence-transformers/all-MiniLM-L6-v2 --revision 1110a243fdf4706b3f48f1d95db1a4f5529b4d41 --batch-size 64",
+  "hardware": {
+    "cpu": "Intel64 Family 6 Model 126 Stepping 5, GenuineIntel",
+    "cpu_count": 8,
+    "ram_bytes": 16745918464,
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.7",
+    "machine": "AMD64",
+    "gpu": null
+  },
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "model_id": "sentence-transformers/all-MiniLM-L6-v2@1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "dimension": 384,
+  "sections_embedded": 32830,
+  "sections_skipped": 1344,
+  "sections_stored": 34174,
+  "truncated_sections": 24272,
+  "max_seq_length": 256,
+  "elapsed_seconds": 5422.487745499937,
+  "sections_per_second": 6.054416633259385
+}

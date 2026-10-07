@@ -1,4 +1,5 @@
 import os
+import time
 import uuid
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
@@ -7,7 +8,7 @@ from threading import Barrier
 
 import httpx
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.schema import CreateSchema, DropSchema
 
@@ -25,7 +26,7 @@ from app.domain.models import (
 from app.services.analysis import AnalysisService
 from app.services.cases import claim_next_case, reap_expired_cases
 from app.services.notifications import claim_notification, deliver_notification
-from app.services.providers import DeterministicProvider
+from app.services.providers import DeterministicProvider, ModelRequest, ModelResponse
 
 pytestmark = pytest.mark.postgres
 
@@ -46,6 +47,18 @@ def postgres_session_factory() -> Generator[sessionmaker[Session], None, None]:
         execution_options={"schema_translate_map": {None: schema}},
     )
     Base.metadata.create_all(test_engine)
+    with test_engine.begin() as connection:
+        connection.execute(
+            text(
+                f'''
+                ALTER TABLE "{schema}".policy_sections
+                ADD COLUMN search_vector tsvector
+                GENERATED ALWAYS AS (
+                    to_tsvector('english', coalesce(heading, '') || ' ' || text)
+                ) STORED
+                '''
+            )
+        )
     factory = sessionmaker(bind=test_engine, expire_on_commit=False)
     try:
         yield factory
@@ -158,6 +171,37 @@ def test_competing_case_claims_skip_locked_and_only_one_wins(
         assert persisted.status == CaseStatus.ANALYZING
         assert persisted.worker_id in {"worker-one", "worker-two"}
         assert persisted.attempts == 1
+
+
+class _SlowProvider(DeterministicProvider):
+    def analyze(self, request: ModelRequest) -> ModelResponse:
+        time.sleep(4)
+        return super().analyze(request)
+
+
+def test_slow_provider_renews_the_lease_without_changing_the_token(
+    postgres_session_factory: sessionmaker[Session],
+) -> None:
+    case_id = _seed_case(postgres_session_factory, include_policy=True)
+    with postgres_session_factory() as session:
+        claimed = claim_next_case(session, worker_id="slow-worker", lease_seconds=2)
+        assert claimed is not None
+        token = claimed.fencing_token
+        started = time.perf_counter()
+        result = AnalysisService(
+            session,
+            Settings(lease_renewal_seconds=1, retrieval_mode="fulltext"),
+            _SlowProvider(),
+        ).analyze(
+            claimed,
+            correlation_id="slow-provider",
+            worker_id="slow-worker",
+        )
+        assert time.perf_counter() - started >= 4
+        assert result.id == case_id
+        assert result.status == CaseStatus.REVIEW_REQUIRED
+        assert result.fencing_token == token
+        assert result.worker_id == "slow-worker"
 
 
 def test_stale_fencing_token_cannot_finalize_reclaimed_case(

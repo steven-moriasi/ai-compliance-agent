@@ -10,6 +10,10 @@ ANALYSIS_LATENCY = Histogram(
     "Model analysis latency",
     ("provider",),
 )
+RETRIEVAL_FALLBACKS = Counter(
+    "compliance_retrieval_fallback_total",
+    "Times vector or hybrid retrieval fell back to lexical search",
+)
 REVIEWS = Counter(
     "compliance_review_total",
     "Human review decisions",

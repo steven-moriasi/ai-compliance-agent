@@ -38,7 +38,7 @@ def test_kubernetes_manifests_match_the_compose_processes() -> None:
         "path: /ready",
         "COMPLIANCE_MODEL_PROVIDER: deterministic",
         "image: ai-compliance-agent:local",
-        "image: postgres:17.5-bookworm",
+        "image: pgvector/pgvector:pg17",
     ):
         assert command in text
     assert "notifier" not in text

@@ -60,6 +60,37 @@ def parse_federal_register_xml(
     return _unique_refs(_parse_document(root))
 
 
+def document_action(payload: bytes, document_number: str | None = None) -> str:
+    """Read the ACTION line. Ingestion stores the title and leaves this in the XML."""
+    root = _document_root(payload, document_number)
+    if root is None:
+        return ""
+    action = root.find("./PREAMB/ACT")
+    if action is None:
+        return ""
+    return normalize_text(" ".join(_paragraphs(action)))
+
+
+def _document_root(payload: bytes, document_number: str | None) -> ET.Element | None:
+    try:
+        parsed = fromstring(payload)
+    except (ET.ParseError, DefusedXmlException):
+        return None
+    if not isinstance(parsed, ET.Element):
+        return None
+    root = parsed
+    if root.tag == "FEDREG":
+        if document_number is None:
+            return None
+        extracted = extract_document_xml(payload, document_number)
+        if extracted is None:
+            return None
+        return _document_root(extracted, document_number)
+    if root.tag not in _DOCUMENT_TAGS:
+        return None
+    return root
+
+
 def extract_document_xml(issue_xml: bytes, document_number: str) -> bytes | None:
     """Return one RULE, PRORULE, or NOTICE element from a GovInfo issue file."""
     try:

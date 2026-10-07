@@ -6,15 +6,8 @@ either an injected embedder or the optional retrieval extra plus a built index.
 
 import hashlib
 import importlib.util
-import json
 from collections.abc import Mapping, Sequence
-from pathlib import Path
-from typing import Protocol
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
-
-from app.domain.models import Policy
+from typing import Any, Protocol
 
 
 class RetrievalUnavailable(Exception):
@@ -35,6 +28,11 @@ def section_embedding_key(heading: str | None, text: str) -> str:
     return hashlib.sha256(body.encode()).hexdigest()
 
 
+def embedding_model_id(model_name: str, revision: str) -> str:
+    """Keep the revision in the stored id so two weight snapshots do not share rows."""
+    return f"{model_name}@{revision}"
+
+
 def cosine(left: Sequence[float], right: Sequence[float]) -> float:
     if len(left) != len(right) or not left:
         return 0.0
@@ -46,72 +44,55 @@ def cosine(left: Sequence[float], right: Sequence[float]) -> float:
     return dot / (left_norm * right_norm)
 
 
-def write_embedding_index(
-    path: Path,
+class SentenceTransformerEmbedder:
+    """Adapter around a loaded model. Tests can pass a fake with the same methods."""
+
+    def __init__(self, model: Any) -> None:
+        self._model = model
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        encoded = self._model.encode(
+            list(texts),
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+        )
+        return [[float(value) for value in vector] for vector in encoded]
+
+    @property
+    def max_seq_length(self) -> int:
+        return int(self._model.max_seq_length)
+
+    def truncated(self, texts: Sequence[str]) -> int:
+        limit = self.max_seq_length
+        tokenized = self._model.tokenizer(
+            list(texts),
+            add_special_tokens=True,
+            truncation=True,
+            max_length=limit + 1,
+            padding=False,
+        )
+        if not isinstance(tokenized, Mapping):
+            raise RetrievalUnavailable("tokenizer did not return token ids")
+        ids = tokenized.get("input_ids")
+        if not isinstance(ids, Sequence):
+            raise RetrievalUnavailable("tokenizer did not return token ids")
+        return sum(len(row) > limit for row in ids)
+
+
+def sentence_transformer_embedder(
     model_name: str,
-    vectors: Mapping[str, Sequence[float]],
-) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "model": model_name,
-        "sections": {key: [float(value) for value in vector] for key, vector in vectors.items()},
-    }
-    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
-
-
-def read_embedding_index(path: Path) -> tuple[str, dict[str, tuple[float, ...]]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    model_name = payload["model"]
-    if not isinstance(model_name, str):
-        raise RetrievalUnavailable("embedding index is missing a model name")
-    raw_sections = payload["sections"]
-    if not isinstance(raw_sections, dict):
-        raise RetrievalUnavailable("embedding index is missing section vectors")
-    sections: dict[str, tuple[float, ...]] = {}
-    for key, vector in raw_sections.items():
-        if not isinstance(key, str) or not isinstance(vector, list):
-            raise RetrievalUnavailable("embedding index has a malformed section vector")
-        sections[key] = tuple(float(value) for value in vector)
-    return model_name, sections
-
-
-def build_embedding_index(
-    session: Session,
-    embedder: Embedder,
-    path: Path,
-    model_name: str,
-) -> int:
-    """Embed every stored section. Query-time filters still decide which ones are eligible."""
-    policies = session.scalars(select(Policy).options(selectinload(Policy.sections)))
-    texts: list[str] = []
-    keys: list[str] = []
-    for policy in policies:
-        for section in policy.sections:
-            body = section_embedding_text(section.heading, section.text)
-            keys.append(section_embedding_key(section.heading, section.text))
-            texts.append(body)
-    if not texts:
-        write_embedding_index(path, model_name, {})
-        return 0
-    vectors = embedder.embed(texts)
-    if len(vectors) != len(keys):
-        raise RetrievalUnavailable("embedder returned a different number of vectors than texts")
-    write_embedding_index(path, model_name, dict(zip(keys, vectors, strict=True)))
-    return len(keys)
-
-
-def sentence_transformer_embedder(model_name: str) -> Embedder:
+    revision: str | None = None,
+) -> SentenceTransformerEmbedder:
+    """Load weights from safetensors at a pinned revision. Callers record that revision."""
     if importlib.util.find_spec("sentence_transformers") is None:
         raise RetrievalUnavailable(
             "Install the retrieval extra before using embedding or hybrid search"
         )
-    from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
+    from sentence_transformers import SentenceTransformer
 
-    model = SentenceTransformer(model_name)
-
-    class _SentenceTransformerEmbedder:
-        def embed(self, texts: Sequence[str]) -> list[list[float]]:
-            encoded = model.encode(list(texts), normalize_embeddings=True)
-            return [[float(value) for value in vector] for vector in encoded]
-
-    return _SentenceTransformerEmbedder()
+    model = SentenceTransformer(
+        model_name,
+        revision=revision,
+        model_kwargs={"use_safetensors": True},
+    )
+    return SentenceTransformerEmbedder(model)

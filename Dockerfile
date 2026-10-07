@@ -16,7 +16,10 @@ RUN groupadd --system compliance \
 
 WORKDIR /app
 COPY --from=builder /build/dist/*.whl /tmp/
-RUN python -m pip install --no-cache-dir /tmp/*.whl \
+RUN whl="$(echo /tmp/ai_compliance_agent-*.whl)" \
+    && python -m pip install --no-cache-dir \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        "${whl}[retrieval]" \
     && rm -rf /tmp/*.whl
 COPY alembic.ini ./
 COPY alembic ./alembic

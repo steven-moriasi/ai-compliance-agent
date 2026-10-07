@@ -13,10 +13,10 @@ from app.services.classifier import load_cfr_prior
 from app.services.embeddings import (
     Embedder,
     RetrievalUnavailable,
-    read_embedding_index,
+    embedding_model_id,
     sentence_transformer_embedder,
 )
-from app.services.retrieval import RetrievalMode, retrieve_policies
+from app.services.retrieval import RetrievalMode, resolve_retrieval_mode, retrieve_policies
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
 ViewerContext = Annotated[
@@ -43,16 +43,18 @@ def search_sections(
     limit: Annotated[int, Query(ge=1, le=20)] = 5,
     embedder: Annotated[Embedder | None, Depends(get_embedder)] = None,
 ) -> SearchResponse:
-    selected: RetrievalMode = mode or settings.retrieval_mode
+    bind = session.get_bind()
+    dialect = bind.dialect.name if bind is not None else "sqlite"
+    requested = mode if mode is not None else settings.retrieval_mode
+    selected: RetrievalMode = resolve_retrieval_mode(requested, dialect)
     case_date = as_of or date.today()
-    index = None
     active_embedder = embedder
     try:
-        if selected != "keyword" and active_embedder is None:
-            index_path = Path(settings.embedding_index_path)
-            if index_path.is_file():
-                _model_name, index = read_embedding_index(index_path)
-            active_embedder = sentence_transformer_embedder(settings.embedding_model)
+        if selected in {"vector", "embedding", "hybrid"} and active_embedder is None:
+            active_embedder = sentence_transformer_embedder(
+                settings.embedding_model,
+                settings.embedding_revision,
+            )
         found = retrieve_policies(
             session,
             q,
@@ -60,7 +62,10 @@ def search_sections(
             limit,
             mode=selected,
             embedder=active_embedder,
-            embedding_index=index,
+            embedding_model_id=embedding_model_id(
+                settings.embedding_model,
+                settings.embedding_revision,
+            ),
             cfr_prior=load_cfr_prior(Path(settings.cfr_prior_path)),
         )
     except RetrievalUnavailable as exc:
