@@ -58,7 +58,9 @@ def _ram_bytes() -> int | None:
 
     status = MemoryStatus()
     status.dwLength = ctypes.sizeof(MemoryStatus)
-    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+    # windll exists only on Windows. getattr keeps the Linux type check quiet.
+    kernel = getattr(getattr(ctypes, "windll", None), "kernel32", None)
+    if kernel is None or not kernel.GlobalMemoryStatusEx(ctypes.byref(status)):
         return None
     return int(status.ullTotalPhys)
 
