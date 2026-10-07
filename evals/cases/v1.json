@@ -37,6 +37,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_completed"
         ]
@@ -99,6 +100,7 @@
         "error_code": null,
         "provider_attempts": 2,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_attempted",
           "analysis_completed"
@@ -156,6 +158,7 @@
         "error_code": null,
         "provider_attempts": 2,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_attempted",
           "analysis_completed"
@@ -213,6 +216,7 @@
         "error_code": null,
         "provider_attempts": 2,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_attempted",
           "analysis_completed"
@@ -270,6 +274,7 @@
         "error_code": null,
         "provider_attempts": 2,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_attempted",
           "analysis_completed"
@@ -319,6 +324,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_completed"
         ]
@@ -360,6 +366,7 @@
         "error_code": "malformed_model_output",
         "provider_attempts": 2,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_attempted",
           "analysis_completed"
@@ -407,6 +414,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_completed"
         ]
@@ -448,6 +456,7 @@
         "error_code": "no_relevant_source",
         "provider_attempts": 0,
         "audit_events": [
+          "analysis_started",
           "analysis_completed"
         ]
       }
@@ -535,6 +544,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_completed"
         ]
@@ -608,6 +618,7 @@
         "error_code": null,
         "provider_attempts": 2,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_attempted",
           "analysis_completed"
@@ -658,6 +669,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_completed"
         ]
@@ -707,6 +719,7 @@
         "error_code": null,
         "provider_attempts": 1,
         "audit_events": [
+          "analysis_started",
           "analysis_attempted",
           "analysis_completed"
         ]

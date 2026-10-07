@@ -20,7 +20,7 @@ sequenceDiagram
     API->>DB: Insert queued case + case_requested audit
     API-->>Analyst: 202 Accepted
 
-    Worker->>DB: Claim oldest queued case
+    Worker->>DB: Claim oldest queued case + analysis_started audit
     DB-->>Worker: Lease + incremented fencing token
     Worker->>DB: Load prompt + policy sections effective on case date
     Worker->>Worker: Rank sections and detect injection signals

@@ -61,7 +61,8 @@ DEMO_PAGE = """<!DOCTYPE html>
         <input id="q" name="q" required value="nitrogen oxides">
         <label for="mode">Mode</label>
         <select id="mode" name="mode">
-          <option value="keyword" selected>keyword</option>
+          <option value="" selected>server default</option>
+          <option value="keyword">keyword</option>
           <option value="fulltext">fulltext</option>
           <option value="vector">vector</option>
           <option value="hybrid">hybrid</option>
@@ -130,16 +131,23 @@ DEMO_PAGE = """<!DOCTYPE html>
       results.innerHTML = "";
       const params = new URLSearchParams({
         q: document.querySelector("#q").value,
-        mode: document.querySelector("#mode").value,
         as_of: asOf.value,
         limit: "5",
       });
+      const mode = document.querySelector("#mode").value;
+      if (mode) params.set("mode", mode);
+      results.textContent = "Searching…";
       try {
         const payload = await readJson(await fetch("/api/v1/search?" + params));
+        results.textContent = "";
         if (!payload.results.length) {
-          results.textContent = "No sections matched.";
+          results.textContent = "No sections matched (" + payload.mode + ").";
           return;
         }
+        const used = document.createElement("p");
+        used.className = "muted";
+        used.textContent = "Mode: " + payload.mode;
+        results.append(used);
         for (const hit of payload.results) {
           const block = document.createElement("article");
           block.className = "hit";
@@ -229,18 +237,39 @@ DEMO_PAGE = """<!DOCTYPE html>
           body: JSON.stringify({ document_id: documentRecord.id, prompt_template_id: promptId }),
         }));
         caseId = created.id;
-        let record = created;
-        for (let attempt = 0; attempt < 20 && ["queued", "analyzing"].includes(record.status); attempt += 1) {
-          view.textContent = "Status: " + record.status + ". Waiting for the analysis worker.";
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          record = await showCase(caseId);
-        }
-        await showCase(caseId);
+        history.replaceState(null, "", "#case=" + caseId);
+        await followCase(caseId);
       } catch (error) {
         view.innerHTML = "<p class='error'></p>";
         view.querySelector("p").textContent = error.message;
       }
     });
+
+    const PENDING = ["queued", "analyzing"];
+    const FOLLOW_LIMIT_SECONDS = 600;
+
+    function noteStatus(record, note) {
+      const line = document.querySelector("#case-view p");
+      if (line) line.textContent = "Status: " + record.status + " · " + note;
+    }
+
+    async function followCase(id) {
+      const started = Date.now();
+      let record = await showCase(id);
+      while (PENDING.includes(record.status)) {
+        const seconds = Math.round((Date.now() - started) / 1000);
+        if (seconds >= FOLLOW_LIMIT_SECONDS) {
+          noteStatus(record, "no result after " + seconds + " s. Check the worker log, then reload to keep watching.");
+          return record;
+        }
+        noteStatus(record, record.status === "queued"
+          ? "waiting for a worker (" + seconds + " s)"
+          : "a worker is analysing it (" + seconds + " s)");
+        await new Promise((resolve) => setTimeout(resolve, seconds < 15 ? 1000 : 3000));
+        record = await showCase(id);
+      }
+      return record;
+    }
 
     async function review(decision) {
       if (!caseId) return;
@@ -262,6 +291,14 @@ DEMO_PAGE = """<!DOCTYPE html>
     loadCorpus().catch((error) => {
       document.querySelector("#corpus").textContent = error.message;
     });
+
+    const linkedCase = location.hash.match(/^#case=([0-9a-f-]{36})$/i);
+    if (linkedCase) {
+      caseId = linkedCase[1];
+      followCase(caseId).catch((error) => {
+        document.querySelector("#case-view").textContent = error.message;
+      });
+    }
   </script>
 </body>
 </html>

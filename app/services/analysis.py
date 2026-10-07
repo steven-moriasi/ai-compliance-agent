@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 from typing import Protocol, cast
@@ -16,6 +17,7 @@ from app.domain.types import JsonObject
 from app.services.audit import append_audit_event
 from app.services.classifier import CfrPrior
 from app.services.embeddings import (
+    Embedder,
     RetrievalUnavailable,
     embedding_model_id,
     sentence_transformer_embedder,
@@ -58,11 +60,13 @@ class AnalysisService:
         settings: Settings,
         provider: ModelProvider,
         cfr_prior: CfrPrior | None = None,
+        embedder_loader: Callable[[], Embedder] | None = None,
     ) -> None:
         self.session = session
         self.settings = settings
         self.provider = provider
         self.cfr_prior = cfr_prior
+        self._embedder_loader = embedder_loader or self._load_configured_embedder
         self._redaction_count = 0
 
     def _heartbeat(
@@ -82,6 +86,12 @@ class AnalysisService:
             interval_seconds=float(interval) if interval is not None else None,
         )
 
+    def _load_configured_embedder(self) -> Embedder:
+        return sentence_transformer_embedder(
+            self.settings.embedding_model,
+            self.settings.embedding_revision,
+        )
+
     def _retrieve(
         self,
         case: ComplianceCase,
@@ -95,13 +105,10 @@ class AnalysisService:
             self.settings.embedding_model,
             self.settings.embedding_revision,
         )
-        embedder = None
+        embedder: Embedder | None = None
         if selected in {"vector", "embedding", "hybrid"}:
             try:
-                embedder = sentence_transformer_embedder(
-                    self.settings.embedding_model,
-                    self.settings.embedding_revision,
-                )
+                embedder = self._embedder_loader()
             except RetrievalUnavailable as exc:
                 return self._fallback(case, correlation_id, worker_id, selected, dialect, str(exc))
         try:

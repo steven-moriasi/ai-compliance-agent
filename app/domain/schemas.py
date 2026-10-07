@@ -200,7 +200,7 @@ class SearchHit(BaseModel):
 class SearchResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    mode: Literal["keyword", "embedding", "hybrid"]
+    mode: Literal["keyword", "fulltext", "vector", "embedding", "hybrid"]
     as_of: date
     results: list[SearchHit]
 

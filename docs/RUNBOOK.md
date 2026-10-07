@@ -133,16 +133,29 @@ into tickets.
 4. Inspect audit events for `analysis_requeued`, `analysis_abandoned`, or `analysis_failed`.
 5. Validate model-provider reachability and quota without logging the API key.
 6. Scale workers only if database connections and provider quota permit.
-7. If leases expire during valid work, raise the lease or add renewal rather than disabling fencing.
+7. Leases renew while a worker is alive. If they still expire during valid work, the worker process is
+   stopping or stalling; raise the lease only after ruling that out, and never disable fencing.
 
 Do not manually mark a case approved or bypass review to clear a queue.
+
+## Incident: a case stays in ANALYZING
+
+`analyzing` means a worker claimed the case; the claim writes an `analysis_started` audit event.
+
+1. Read the worker log. A traceback names the error; the worker hands the case back to the queue
+   (`analysis_requeued`) or fails it after the last attempt (`analysis_abandoned`) and keeps polling.
+2. If the log shows the worker still inside a model call, compare provider latency with
+   `local_model_timeout_seconds`. CPU inference on a 3B model can take minutes per attempt.
+3. If no worker is running, start one. The reaper requeues the case once its lease expires.
+4. A `retrieval_fallback` event means the embedding model or index was unavailable and the case
+   used full text. The worker log at startup states which.
 
 ## Incident: cases repeatedly expire
 
 1. Confirm worker processes are not restarting or being terminated.
 2. Check provider latency and network timeouts.
 3. Confirm host clocks are synchronized.
-4. Compare `analysis_lease_seconds` with observed analysis duration. One SQLite keyword query over the loaded corpus took 124411 ms (`evals/reports/keyword_retrieval.json`). The default lease is 120 seconds, so that query does not finish inside the default lease. That file is one observation, not a percentile. On PostgreSQL, keyword p50 over 10 titles was 34808.43209999148 ms and full-text p95 over 50 titles was 131.6251999232918 ms (`evals/reports/retrieval_latency_2026-10-07.json`). Full text is the PostgreSQL default.
+4. Compare `analysis_lease_seconds` with observed analysis duration. One SQLite keyword query over the loaded corpus took 124411 ms (`evals/reports/keyword_retrieval.json`). The default lease is 120 seconds, so that query does not finish inside the default lease. That file is one observation, not a percentile. On PostgreSQL, keyword p50 over 10 titles was 34808.4 ms and full-text p95 over 50 titles was 131.6 ms (`evals/reports/retrieval_latency_2026-10-07.json`). Hybrid is the PostgreSQL default and falls back to full text when the embedding model or index is missing.
 5. Inspect attempt counts and preserve exhausted cases as evidence.
 6. Submit a new case only after correcting the underlying condition.
 

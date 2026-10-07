@@ -12,6 +12,8 @@ def test_demo_page_offers_search_cases_and_review(client: TestClient) -> None:
     assert "text/html" in response.headers["content-type"]
     page = response.text
     assert "Search policy sections" in page
+    assert "server default" in page
+    assert "Searching…" in page
     assert 'id="case-form"' in page
     assert 'id="review-form"' in page
     assert 'id="audit-log"' in page

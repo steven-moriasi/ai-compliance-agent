@@ -6,6 +6,7 @@ either an injected embedder or the optional retrieval extra plus a built index.
 
 import hashlib
 import importlib.util
+import threading
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
@@ -79,20 +80,50 @@ class SentenceTransformerEmbedder:
         return sum(len(row) > limit for row in ids)
 
 
+_LOADED_EMBEDDERS: dict[tuple[str, str | None], SentenceTransformerEmbedder] = {}
+_LOAD_LOCK = threading.Lock()
+
+
 def sentence_transformer_embedder(
     model_name: str,
     revision: str | None = None,
+) -> SentenceTransformerEmbedder:
+    """Return the model for this name and revision, loading it once per process.
+
+    Loading takes seconds on a CPU, so the worker and the search route share one instance.
+    Failures are not cached. Every load failure surfaces as `RetrievalUnavailable`, which
+    callers treat as a reason to fall back to lexical search.
+    """
+    key = (model_name, revision)
+    with _LOAD_LOCK:
+        loaded = _LOADED_EMBEDDERS.get(key)
+        if loaded is None:
+            loaded = _load_sentence_transformer(model_name, revision)
+            _LOADED_EMBEDDERS[key] = loaded
+    return loaded
+
+
+def _load_sentence_transformer(
+    model_name: str,
+    revision: str | None,
 ) -> SentenceTransformerEmbedder:
     """Load weights from safetensors at a pinned revision. Callers record that revision."""
     if importlib.util.find_spec("sentence_transformers") is None:
         raise RetrievalUnavailable(
             "Install the retrieval extra before using embedding or hybrid search"
         )
-    from sentence_transformers import SentenceTransformer
+    try:
+        from sentence_transformers import SentenceTransformer
 
-    model = SentenceTransformer(
-        model_name,
-        revision=revision,
-        model_kwargs={"use_safetensors": True},
-    )
+        model = SentenceTransformer(
+            model_name,
+            revision=revision,
+            model_kwargs={"use_safetensors": True},
+        )
+    except Exception as exc:
+        # torch, the model hub and the weight files fail with unrelated exception types.
+        # For retrieval they all mean the same thing: this process has no embedding model.
+        raise RetrievalUnavailable(
+            f"embedding model {model_name} could not be loaded ({type(exc).__name__})"
+        ) from exc
     return SentenceTransformerEmbedder(model)

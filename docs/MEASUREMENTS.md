@@ -135,8 +135,8 @@ titles because it still loads every eligible section into Python.
 
 | Mode | Queries | p50 | p95 | max |
 | --- | --- | --- | --- | --- |
-| fulltext | 50 | 4.889549978543073 ms | 131.6251999232918 ms | 193.29730002209544 ms |
-| keyword | 10 | 34808.43209999148 ms | 40368.222634959966 ms | 41023.53229990695 ms |
+| fulltext | 50 | 4.9 ms | 131.6 ms | 193.3 ms |
+| keyword | 10 | 34808.4 ms | 40368.2 ms | 41023.5 ms |
 
 Full-text p95 is under one second on this host. Keyword p50 on PostgreSQL is 34808 ms, which
 finishes inside the default 120 second lease. The SQLite observation above does not.
@@ -159,8 +159,8 @@ Recorded in `evals/reports/embedding_index_2026-10-07.json` at `2026-10-07T12:37
 | Sections embedded in that process | 32830 |
 | Sections skipped because they were already stored | 1344 |
 | Truncated at `max_seq_length` 256 | 24272 |
-| Elapsed seconds | 5422.487745499937 |
-| Sections per second | 6.054416633259385 |
+| Elapsed seconds | 5422.5 |
+| Sections per second | 6.1 |
 
 The skipped rows are the batches committed before this process was resumed. Throughput is
 embedded sections divided by this process's elapsed time, including model load. 24272 truncated
@@ -173,27 +173,27 @@ same git SHA and dataset, same 50 titles and seed as the full-text latency repor
 
 | Mode | Queries | p50 | p95 | max |
 | --- | --- | --- | --- | --- |
-| vector | 50 | 164.90989999147132 ms | 236.06449492508546 ms | 267.7090000361204 ms |
-| hybrid | 50 | 247.5049999775365 ms | 1594.2314949992574 ms | 1815.9228999866173 ms |
+| vector | 50 | 164.9 ms | 236.1 ms | 267.7 ms |
+| hybrid | 50 | 247.5 ms | 1594.2 ms | 1815.9 ms |
 
 Hybrid p95 on these titles is over one second. Full-text p95 on the same titles is not.
 
 ## Retrieval quality
 
 Recorded in `evals/reports/retrieval_eval_2026-10-07.json` at `2026-10-07T13:06:56Z`. The document
-set has 199 items and mean lexical overlap 0.897499527638191. The curated set has 20 items and
-mean lexical overlap 0.58333335. `section_level_v1` is missing. Recall@5:
+set has 199 items and mean lexical overlap 0.897. The curated set has 20 items and
+mean lexical overlap 0.583. `section_level_v1` is missing. Recall@5:
 
 | Mode | Document set | Curated set (14 ranked items) |
 | --- | --- | --- |
-| keyword | 0.7035175879396985 | 0.07142857142857142 |
-| fulltext | 0.20603015075376885 | 0.42857142857142855 |
-| vector | 0.7286432160804021 | 0.5 |
-| hybrid | 0.7286432160804021 | 0.6428571428571429 |
-| hybrid_prior | 0.7286432160804021 | 0.6428571428571429 |
+| keyword | 0.704 | 0.071 |
+| fulltext | 0.206 | 0.429 |
+| vector | 0.729 | 0.5 |
+| hybrid | 0.729 | 0.643 |
+| hybrid_prior | 0.729 | 0.643 |
 
 Keyword `p50_ms` in that report is the score after the sections were loaded. The document-set
-load was 228749.9185000779 ms. It is not the uncached keyword latency in the table above.
+load was 228749.9 ms. It is not the uncached keyword latency in the table above.
 Full text returned hits for 0 of 4 negative curated queries. Vector, hybrid, hybrid plus the
 prior, and keyword returned hits for all 4. The prior does not move curated MRR@10 by more than
 0.002. [ADR 008](adr/008-hybrid-retrieval-default.md) keeps it off the default path.

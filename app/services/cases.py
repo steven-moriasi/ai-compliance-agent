@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Protocol, cast
 
@@ -17,6 +18,7 @@ def claim_next_case(
     session: Session,
     worker_id: str,
     lease_seconds: int,
+    correlation_id: str | None = None,
 ) -> ComplianceCase | None:
     candidate = (
         select(ComplianceCase.id)
@@ -48,10 +50,85 @@ def claim_next_case(
             )
         ),
     )
-    session.commit()
     if claimed.rowcount != 1:
+        session.rollback()
         return None
-    return session.get(ComplianceCase, case_id, populate_existing=True)
+    case = session.get(ComplianceCase, case_id, populate_existing=True)
+    if case is None:
+        session.rollback()
+        return None
+    append_audit_event(
+        session,
+        event_type="analysis_started",
+        actor_id=worker_id,
+        correlation_id=correlation_id or str(uuid.uuid4()),
+        case_id=case_id,
+        details={"attempt": case.attempts, "fencing_token": case.fencing_token},
+    )
+    session.commit()
+    return case
+
+
+def release_failed_claim(
+    session: Session,
+    *,
+    case_id: str,
+    worker_id: str,
+    fencing_token: int,
+    max_attempts: int,
+    correlation_id: str,
+    error_type: str,
+) -> CaseStatus | None:
+    """Hand back a case after an unexpected worker error instead of waiting for the lease.
+
+    The case returns to the queue, or fails once its attempts are used up, the same way the
+    reaper treats an expired lease. The fencing guard makes this a no-op for a worker that
+    has already lost the case. Only the exception type is recorded, never its message,
+    because messages can quote document text.
+    """
+    session.rollback()
+    owned = (
+        ComplianceCase.id == case_id,
+        ComplianceCase.status == CaseStatus.ANALYZING,
+        ComplianceCase.worker_id == worker_id,
+        ComplianceCase.fencing_token == fencing_token,
+    )
+    attempts = session.scalar(select(ComplianceCase.attempts).where(*owned))
+    if attempts is None:
+        session.rollback()
+        return None
+    now = datetime.now(UTC)
+    if attempts >= max_attempts:
+        status = CaseStatus.FAILED
+        values: dict[str, object] = {
+            "status": status,
+            "error_code": "analysis_worker_error",
+            "error_message": "Analysis stopped on an unexpected worker error",
+            "completed_at": now,
+            "lease_expires_at": None,
+        }
+        event_type = "analysis_abandoned"
+    else:
+        status = CaseStatus.QUEUED
+        values = {"status": status, "worker_id": None, "lease_expires_at": None}
+        event_type = "analysis_requeued"
+    released = cast(
+        _RowCountResult,
+        session.execute(update(ComplianceCase).where(*owned).values(**values)),
+    )
+    if released.rowcount != 1:
+        session.rollback()
+        return None
+    append_audit_event(
+        session,
+        event_type=event_type,
+        actor_id=worker_id,
+        correlation_id=correlation_id,
+        case_id=case_id,
+        details={"attempts": attempts, "fencing_token": fencing_token, "error": error_type},
+    )
+    session.commit()
+    return status
 
 
 def renew_case_lease(

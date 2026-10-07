@@ -112,7 +112,9 @@ See the [runbook](docs/RUNBOOK.md) for startup and incident procedures.
 `docker compose up --build -d` is the local stack. With `COMPLIANCE_RETRIEVAL_MODE` unset,
 PostgreSQL search uses hybrid retrieval and SQLite keeps keyword overlap. Hybrid needs the
 `retrieval` extra and a built `section_embeddings` index. Analysis falls back to full text when
-either is missing. Load the cached Federal Register window after migrations, then embed it:
+either is missing and records a `retrieval_fallback` audit event. The worker loads the embedding
+model once at startup, so the first start after installing the extra also downloads the pinned
+revision. Load the cached Federal Register window after migrations, then embed it:
 
 ```bash
 set COMPLIANCE_DATABASE_URL=postgresql+psycopg://compliance:compliance@127.0.0.1:5432/compliance
@@ -124,11 +126,11 @@ py -3 -m app.ingestion.embed
 
 On this host that load took 130502 ms and wrote dataset `840a6be0a156`
 (`evals/reports/federal_register_corpus_postgres.json`). Embedding all 34174 sections took
-5422.487745499937 seconds at 6.054416633259385 sections per second, and 24272 sections were
+5422.5 seconds at 6.1 sections per second, and 24272 sections were
 truncated at 256 tokens (`evals/reports/embedding_index_2026-10-07.json`). Full-text p95 over
-50 policy titles was 131.6251999232918 ms
+50 policy titles was 131.6 ms
 (`evals/reports/retrieval_latency_2026-10-07.json`). Vector p95 on the same titles was
-236.06449492508546 ms; hybrid p95 was 1594.2314949992574 ms
+236.1 ms; hybrid p95 was 1594.2 ms
 (`evals/reports/retrieval_latency_vector_2026-10-07.json`). The mode comparison that selected
 hybrid is in `evals/reports/retrieval_eval_2026-10-07.json` and
 [ADR 008](docs/adr/008-hybrid-retrieval-default.md). Keyword search on the same database is
@@ -237,7 +239,7 @@ All variables use the `COMPLIANCE_` prefix.
 | `CONFIDENCE_THRESHOLD` | `0.7` | validation finding threshold |
 | `MAX_DOCUMENT_BYTES` | `262144` | ingestion byte limit |
 | `ANALYSIS_LEASE_SECONDS` | `120` | worker lease duration |
-| `RETRIEVAL_MODE` | unset | `keyword`, `fulltext`, `embedding`, or `hybrid`; unset uses full text on PostgreSQL and keyword elsewhere |
+| `RETRIEVAL_MODE` | unset | `keyword`, `fulltext`, `vector`, `embedding`, or `hybrid`; unset uses hybrid on PostgreSQL and keyword elsewhere |
 | `ANALYSIS_MAX_ATTEMPTS` | `3` | terminal attempt limit |
 | `NOTIFICATION_WEBHOOK_URL` | unset | review event destination |
 | `NOTIFICATION_WEBHOOK_SECRET` | unset | HMAC signing secret |

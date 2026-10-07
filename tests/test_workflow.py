@@ -173,6 +173,7 @@ def test_human_reviewed_analysis_flow(
     audit = client.get(f"/api/v1/cases/{case_id}/audit").json()
     assert [event["event_type"] for event in audit] == [
         "case_requested",
+        "analysis_started",
         "analysis_attempted",
         "analysis_completed",
         "case_reviewed",
@@ -353,6 +354,7 @@ def test_repeated_malformed_output_requires_review_without_raw_output(
     assert provider.requests[1].validation_feedback == ("malformed_model_output",)
     assert [event.event_type for event in audit_events] == [
         "case_requested",
+        "analysis_started",
         "analysis_attempted",
         "analysis_attempted",
         "analysis_completed",
@@ -417,9 +419,10 @@ def test_no_relevant_source_requires_review_without_provider_call(
         )
     assert [event.event_type for event in audit_events] == [
         "case_requested",
+        "analysis_started",
         "analysis_completed",
     ]
-    assert audit_events[1].details["provider_invoked"] is False
+    assert audit_events[2].details["provider_invoked"] is False
 
 
 def test_provider_failure_is_persisted_without_exception_details(
@@ -466,10 +469,11 @@ def test_provider_failure_is_persisted_without_exception_details(
         )
     assert [event.event_type for event in audit_events] == [
         "case_requested",
+        "analysis_started",
         "analysis_attempted",
         "analysis_failed",
     ]
-    assert audit_events[1].details["result"] == "provider_error"
+    assert audit_events[2].details["result"] == "provider_error"
 
 
 def test_role_boundary_rejects_viewer_writes(client: TestClient) -> None:
