@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_revision: str = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
     cfr_prior_path: str = "data/models/cfr_prior.json"
+    question_source_limit: int = Field(default=4, ge=1, le=10)
+    question_source_chars: int = Field(default=1500, ge=200, le=20000)
 
 
 @lru_cache

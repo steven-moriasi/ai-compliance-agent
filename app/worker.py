@@ -11,11 +11,13 @@ from app.core.config import Settings, get_settings
 from app.core.metrics import ANALYSES, ANALYSIS_LATENCY
 from app.infrastructure.database import SessionLocal, engine
 from app.services.analysis import AnalysisService
+from app.services.answers import AnswerService
 from app.services.cases import claim_next_case, release_failed_claim
 from app.services.classifier import CfrPrior, load_cfr_prior
 from app.services.embeddings import Embedder, RetrievalUnavailable, sentence_transformer_embedder
 from app.services.provider_factory import build_provider
-from app.services.providers import ModelProvider
+from app.services.providers import AnswerProvider, ModelProvider
+from app.services.questions import claim_next_question, release_failed_question
 from app.services.redaction import install_log_redaction
 from app.services.retrieval import resolve_retrieval_mode
 
@@ -108,6 +110,52 @@ def process_next_case(
     return True
 
 
+def process_next_question(
+    session: Session,
+    settings: Settings,
+    provider: AnswerProvider,
+    worker_id: str,
+    *,
+    cfr_prior: CfrPrior | None = None,
+    embedder_loader: Callable[[], Embedder] | None = None,
+) -> bool:
+    """Claim and answer one policy question. Returns False when nothing was queued."""
+    correlation_id = str(uuid.uuid4())
+    question = claim_next_question(
+        session,
+        worker_id=worker_id,
+        lease_seconds=settings.analysis_lease_seconds,
+        correlation_id=correlation_id,
+    )
+    if question is None:
+        return False
+    question_id = question.id
+    fencing_token = question.fencing_token
+    try:
+        AnswerService(
+            session,
+            settings,
+            provider,
+            cfr_prior=cfr_prior,
+            embedder_loader=embedder_loader,
+        ).answer(question, correlation_id=correlation_id, worker_id=worker_id)
+    except Exception as exc:
+        logger.exception("Question %s stopped: %s", question_id, type(exc).__name__)
+        try:
+            release_failed_question(
+                session,
+                question_id=question_id,
+                worker_id=worker_id,
+                fencing_token=fencing_token,
+                max_attempts=settings.analysis_max_attempts,
+                correlation_id=correlation_id,
+                error_type=type(exc).__name__,
+            )
+        except SQLAlchemyError:
+            logger.exception("Question %s could not be released; the reaper will", question_id)
+    return True
+
+
 def run_worker() -> None:
     install_log_redaction()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -116,10 +164,21 @@ def run_worker() -> None:
     cfr_prior = load_cfr_prior(Path(settings.cfr_prior_path))
     embedder_loader = load_worker_embedder(settings, engine.dialect.name)
     worker_id = f"analysis-worker-{uuid.uuid4()}"
-    logger.info("Worker %s is polling for cases with the %s provider", worker_id, provider.name)
+    logger.info(
+        "Worker %s is polling for cases and questions with the %s provider",
+        worker_id,
+        provider.name,
+    )
     while True:
         with SessionLocal() as session:
             claimed = process_next_case(
+                session,
+                settings,
+                provider,
+                worker_id,
+                cfr_prior=cfr_prior,
+                embedder_loader=embedder_loader,
+            ) or process_next_question(
                 session,
                 settings,
                 provider,

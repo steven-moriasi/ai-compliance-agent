@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routes import cases, catalog, demo, health, search
+from app.api.routes import cases, catalog, demo, health, questions, search
 from app.services.redaction import install_log_redaction
 
 install_log_redaction()
@@ -11,3 +11,4 @@ app.include_router(demo.router)
 app.include_router(catalog.router)
 app.include_router(cases.router)
 app.include_router(search.router)
+app.include_router(questions.router)

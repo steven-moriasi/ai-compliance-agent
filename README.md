@@ -35,6 +35,7 @@ The model has no authority to mutate policies or finalize decisions. Every compl
 | Grounding | effective-dated section retrieval and exact-quote validation within the cited section |
 | Retrieval | PostgreSQL hybrid (full text + MiniLM in pgvector); keyword overlap remains the SQLite baseline |
 | Hallucination mitigation | retrieved-source checks, confidence finding, mandatory review |
+| Grounded answers | numbered sources, word-for-word quote checks, unanswered when unsupported |
 | Regression evidence | versioned deterministic corpus for retrieval, citations, retries, and failures |
 | Prompt injection | untrusted-document envelope, signal detection, no model-controlled actions |
 | Durable execution | PostgreSQL queue, worker leases, reaper, fencing tokens, concurrency tests |
@@ -137,9 +138,9 @@ hybrid is in `evals/reports/retrieval_eval_2026-10-07.json` and
 still the slow baseline.
 
 The CFR-part comparison on that dataset is `evals/reports/cfr_classifier_2026-10-07.json`.
-On 99 held-out documents the MLP top-1 hit rate is 0.8383838383838383, the same as naive Bayes
-and below TF-IDF logistic regression at 0.8484848484848485. Gold population stability is
-0.6884761992732462. The promotion gate refused the MLP
+On 99 held-out documents the MLP top-1 hit rate is 0.838, the same as naive Bayes
+and below TF-IDF logistic regression at 0.848. Gold population stability is
+0.688. The promotion gate refused the MLP
 ([ADR 009](docs/adr/009-cfr-classifier-not-promoted.md)).
 
 Stop the stack:
@@ -181,6 +182,8 @@ SQLite is the credential-free default for local tests. PostgreSQL is the referen
 | `GET` | `/api/v1/cases/{id}` | any application role | read workflow and model evidence |
 | `POST` | `/api/v1/cases/{id}/reviews` | admin, reviewer | approve or reject with rationale |
 | `GET` | `/api/v1/cases/{id}/audit` | any application role | read ordered case audit events |
+| `POST` | `/api/v1/questions` | any application role | queue a question about policies in force on a date |
+| `GET` | `/api/v1/questions/{id}` | the asker, admin | read the answer, its quotes, and the sources it was given |
 | `GET` | `/health` | public | process liveness |
 | `GET` | `/ready` | public | database readiness |
 | `GET` | `/metrics` | public in reference app | Prometheus exposition |
@@ -218,6 +221,56 @@ The remote adapter sends:
 Configure the provider only through environment or managed deployment secrets. Provider errors are
 stored as stable redacted application errors rather than raw response text.
 
+### Local model
+
+`COMPLIANCE_MODEL_PROVIDER=ollama` sends the same requests to Ollama's OpenAI-compatible endpoint,
+with the schema in the system prompt because small models are asked for a JSON object rather than
+a strict schema. Nothing leaves the machine.
+
+```bash
+ollama pull qwen2.5:3b
+set COMPLIANCE_MODEL_PROVIDER=ollama
+py -3 -m app.worker
+```
+
+On a laptop CPU a 3B model takes from about half a minute to a few minutes per call, which is why
+cases and questions run on the worker rather than inside an HTTP request.
+
+## Asking the policies
+
+The demo page's **Ask the policies** panel, and `POST /api/v1/questions`, answer a question from
+the policy sections in force on a chosen date:
+
+1. The worker retrieves the top sections with the configured mode (hybrid on PostgreSQL).
+2. Each section is cut at a word boundary to `QUESTION_SOURCE_CHARS` and numbered.
+3. The model returns JSON: whether the sources answer the question, the answer, and for each
+   statement a source number and a quote.
+4. Every quote must appear word for word in the source it names, and every date or duration in
+   the answer must sit inside a quote. A failed check gets one retry with the failures spelled
+   out; a second failure leaves the question unanswered.
+5. The reader sees either a checked answer with its quotes and Federal Register links, or
+   "no supported answer" with the sources the model was given.
+
+The question is redacted before the model sees it, and instruction-like text is flagged. The model
+is never trained on the policies; it reads the retrieved sections on every question. See
+[ADR 010](docs/adr/010-grounded-policy-answers.md).
+
+Ollama's OpenAI-compatible endpoint cannot set the context window per request, and it truncates an
+overflowing prompt without an error. Four sources of 1,500 characters and the instructions fit a
+4,096-token window with room for the answer. If you raise either limit, raise
+`OLLAMA_CONTEXT_LENGTH` on the Ollama server as well.
+
+Measure answers on the loaded corpus with the model you intend to use:
+
+```bash
+set COMPLIANCE_MODEL_PROVIDER=ollama
+py -3 -m evals.answer_eval
+```
+
+`evals/answers/questions_v1.jsonl` holds in-scope questions with the Federal Register documents
+that should be cited, questions dated before their document took effect, and out-of-scope
+questions that should go unanswered. The report lands in `evals/reports/answer_eval.json`.
+
 ## Configuration
 
 All variables use the `COMPLIANCE_` prefix.
@@ -240,6 +293,11 @@ All variables use the `COMPLIANCE_` prefix.
 | `MAX_DOCUMENT_BYTES` | `262144` | ingestion byte limit |
 | `ANALYSIS_LEASE_SECONDS` | `120` | worker lease duration |
 | `RETRIEVAL_MODE` | unset | `keyword`, `fulltext`, `vector`, `embedding`, or `hybrid`; unset uses hybrid on PostgreSQL and keyword elsewhere |
+| `LOCAL_MODEL_BASE_URL` | `http://127.0.0.1:11434/v1` | Ollama's OpenAI-compatible endpoint |
+| `LOCAL_MODEL_NAME` | `qwen2.5:3b` | local model tag |
+| `LOCAL_MODEL_TIMEOUT_SECONDS` | `180` | per-call timeout for the local model |
+| `QUESTION_SOURCE_LIMIT` | `4` | sections given to the model per question |
+| `QUESTION_SOURCE_CHARS` | `1500` | characters kept from each section |
 | `ANALYSIS_MAX_ATTEMPTS` | `3` | terminal attempt limit |
 | `NOTIFICATION_WEBHOOK_URL` | unset | review event destination |
 | `NOTIFICATION_WEBHOOK_SECRET` | unset | HMAC signing secret |
@@ -308,7 +366,7 @@ app/domain/          persistence models, enums, and API/model schemas
 app/infrastructure/  database sessions and authentication
 app/services/        retrieval, providers, validation, workflow, audit, outbox
 alembic/              versioned database migrations
-evals/                 versioned deterministic verification cases and runner
+evals/                 versioned verification cases, retrieval and answer evaluations
 tests/                 workflow, security, provider, recovery, and PostgreSQL concurrency tests
 docs/                  architecture, security, operations, decisions, and roadmap
 ```

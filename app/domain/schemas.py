@@ -3,7 +3,13 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.domain.enums import AnalysisOutcome, CaseStatus, PolicyStatus, ReviewDecision
+from app.domain.enums import (
+    AnalysisOutcome,
+    CaseStatus,
+    PolicyStatus,
+    QuestionStatus,
+    ReviewDecision,
+)
 from app.domain.types import JsonObject
 
 
@@ -215,3 +221,83 @@ class AuditEventRead(BaseModel):
     correlation_id: str
     details: JsonObject
     created_at: datetime
+
+
+class QuestionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=3, max_length=1000)
+    as_of: date | None = None
+
+
+class AnswerCitation(BaseModel):
+    """A claim's support: the number of a supplied source and words copied from it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: int = Field(ge=1, le=20)
+    quote: str = Field(min_length=1, max_length=1000)
+
+
+class ModelAnswer(BaseModel):
+    """What the model must return. Numbered sources are easier to cite than section ids."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    supported: bool
+    answer: str = Field(min_length=1, max_length=4000)
+    citations: list[AnswerCitation] = Field(default_factory=list, max_length=8)
+
+
+class QuestionSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: int
+    section_id: str
+    policy_id: str
+    name: str
+    version: int
+    section_ref: str
+    heading: str | None
+    title: str | None
+    document_number: str | None
+    citation: str | None
+    source_url: str | None
+    effective_from: date | None
+    score: float
+
+
+class QuestionCitation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: int
+    section_id: str
+    policy_id: str
+    section_ref: str
+    quote: str
+
+
+class QuestionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    question: str
+    as_of: date
+    status: QuestionStatus
+    requested_by: str
+    retrieval_mode: str | None
+    sources: list[QuestionSource]
+    answer: str | None
+    citations: list[QuestionCitation]
+    validation_errors: list[str]
+    injection_signals: list[str]
+    redaction_count: int | None
+    model_provider: str | None
+    model_name: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    latency_ms: int | None
+    error_code: str | None
+    attempts: int
+    created_at: datetime
+    completed_at: datetime | None

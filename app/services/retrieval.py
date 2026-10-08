@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -74,6 +74,65 @@ def resolve_retrieval_mode(requested: RetrievalMode | None, dialect: str) -> Ret
     if dialect == "postgresql":
         return "hybrid"
     return "keyword"
+
+
+SEMANTIC_MODES: frozenset[str] = frozenset({"vector", "embedding", "hybrid"})
+
+
+@dataclass(frozen=True)
+class RetrievalResult:
+    policies: list[RetrievedPolicy]
+    mode: RetrievalMode
+    fallback_from: RetrievalMode | None = None
+    fallback_reason: str | None = None
+
+
+def retrieve_with_fallback(
+    session: Session,
+    text: str,
+    as_of: date,
+    *,
+    requested: RetrievalMode | None,
+    embedder_loader: Callable[[], Embedder],
+    embedding_model_id: str,
+    cfr_prior: CfrPrior | None = None,
+    limit: int = 5,
+) -> RetrievalResult:
+    """Run the configured mode. A semantic mode without a model or index drops to lexical.
+
+    Callers record the fallback; this function only reports it.
+    """
+    bind = session.get_bind()
+    dialect = bind.dialect.name if bind is not None else "sqlite"
+    selected = resolve_retrieval_mode(requested, dialect)
+    if selected not in SEMANTIC_MODES:
+        policies = retrieve_policies(
+            session, text, as_of, limit, mode=selected, cfr_prior=cfr_prior
+        )
+        return RetrievalResult(policies=policies, mode=selected)
+    try:
+        policies = retrieve_policies(
+            session,
+            text,
+            as_of,
+            limit,
+            mode=selected,
+            embedder=embedder_loader(),
+            embedding_model_id=embedding_model_id,
+            cfr_prior=cfr_prior,
+        )
+        return RetrievalResult(policies=policies, mode=selected)
+    except RetrievalUnavailable as exc:
+        fallback: RetrievalMode = "fulltext" if dialect == "postgresql" else "keyword"
+        policies = retrieve_policies(
+            session, text, as_of, limit, mode=fallback, cfr_prior=cfr_prior
+        )
+        return RetrievalResult(
+            policies=policies,
+            mode=fallback,
+            fallback_from=selected,
+            fallback_reason=str(exc),
+        )
 
 
 def retrieve_policies(

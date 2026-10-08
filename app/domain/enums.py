@@ -16,6 +16,14 @@ class CaseStatus(StrEnum):
     FAILED = "failed"
 
 
+class QuestionStatus(StrEnum):
+    QUEUED = "queued"
+    ANSWERING = "answering"
+    ANSWERED = "answered"
+    UNANSWERED = "unanswered"
+    FAILED = "failed"
+
+
 class AnalysisOutcome(StrEnum):
     COMPLIANT = "compliant"
     NON_COMPLIANT = "non_compliant"

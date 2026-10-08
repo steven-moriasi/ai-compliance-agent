@@ -10,6 +10,7 @@ from app.domain.enums import (
     IngestionStatus,
     NotificationStatus,
     PolicyStatus,
+    QuestionStatus,
     ReviewDecision,
 )
 from app.domain.types import JsonObject
@@ -155,6 +156,42 @@ class ComplianceCase(Base):
 
     document: Mapped[Document] = relationship()
     prompt_template: Mapped[PromptTemplate] = relationship()
+
+
+class PolicyQuestion(Base):
+    """A question answered from retrieved policy sections, with the sources it was shown."""
+
+    __tablename__ = "policy_questions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    question: Mapped[str] = mapped_column(Text)
+    as_of: Mapped[date] = mapped_column(Date)
+    status: Mapped[QuestionStatus] = mapped_column(
+        Enum(QuestionStatus, native_enum=False), default=QuestionStatus.QUEUED, index=True
+    )
+    requested_by: Mapped[str] = mapped_column(String(160))
+    retrieval_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    sources: Mapped[list[JsonObject]] = mapped_column(JSON, default=list)
+    answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    citations: Mapped[list[JsonObject]] = mapped_column(JSON, default=list)
+    validation_errors: Mapped[list[str]] = mapped_column(JSON, default=list)
+    injection_signals: Mapped[list[str]] = mapped_column(JSON, default=list)
+    redaction_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    model_provider: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    worker_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    fencing_token: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ReviewRecord(Base):

@@ -19,3 +19,8 @@ REVIEWS = Counter(
     "Human review decisions",
     ("decision",),
 )
+QUESTIONS = Counter(
+    "compliance_question_total",
+    "Policy question outcomes",
+    ("status", "provider"),
+)

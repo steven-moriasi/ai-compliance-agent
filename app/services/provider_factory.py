@@ -1,8 +1,8 @@
 from app.core.config import Settings
-from app.services.providers import DeterministicProvider, ModelProvider, OpenAICompatibleProvider
+from app.services.providers import DeterministicProvider, LanguageModel, OpenAICompatibleProvider
 
 
-def build_provider(settings: Settings) -> ModelProvider:
+def build_provider(settings: Settings) -> LanguageModel:
     if settings.model_provider == "deterministic":
         return DeterministicProvider()
     if settings.model_provider == "openai-compatible":

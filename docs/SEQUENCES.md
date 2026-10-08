@@ -110,6 +110,34 @@ sequenceDiagram
 
 The API does not expose raw provider exceptions, response bodies, or credentials.
 
+## Answer a policy question
+
+```mermaid
+sequenceDiagram
+    actor Reader
+    participant API
+    participant DB as PostgreSQL
+    participant Worker
+    participant Model
+
+    Reader->>API: POST /api/v1/questions (question, as_of)
+    API->>DB: Insert queued question + question_asked audit
+    API-->>Reader: 202 with question id
+    Worker->>DB: Claim oldest queued question + question_started audit
+    Worker->>DB: Retrieve sections effective on as_of
+    Worker->>Model: Redacted question + numbered, trimmed sources + answer schema
+    Model-->>Worker: supported flag, answer, source numbers and quotes
+    Worker->>Worker: Check each quote word for word in its source
+    alt a check fails on the first attempt
+        Worker->>Model: Retry once with the failures as instructions
+        Model-->>Worker: Revised answer
+    end
+    Worker->>DB: ANSWERED or UNANSWERED under the lease + audit with cited sources
+    Reader->>API: GET /api/v1/questions/{id} until it finishes
+```
+
+An unanswered question still returns the sources the model was given.
+
 ## Notification retry and dead letter
 
 ```mermaid

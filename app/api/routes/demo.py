@@ -45,6 +45,12 @@ DEMO_PAGE = """<!DOCTYPE html>
     .muted { color: #5c564c; }
     .hit, .event { border-top: 1px solid #eee6d8; padding: 0.6rem 0; }
     .error { color: #8a1f1f; }
+    .wide { grid-column: 1 / -1; }
+    .answer { font-size: 1.05rem; margin: 0.75rem 0; }
+    .quote { border-left: 3px solid #b9ab92; padding-left: 0.6rem; margin: 0.6rem 0; }
+    .quote p:first-child { font-style: italic; }
+    details { margin-top: 0.75rem; }
+    summary { cursor: pointer; }
     @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -54,6 +60,17 @@ DEMO_PAGE = """<!DOCTYPE html>
     <p class="muted" id="corpus">Loading corpus…</p>
   </header>
   <main class="grid">
+    <section class="wide">
+      <h2>Ask the policies</h2>
+      <form id="question-form">
+        <label for="question">Question</label>
+        <textarea id="question" required minlength="3" maxlength="1000">How must nitrogen oxides at the stack be reported?</textarea>
+        <label for="question-as-of">Policies in force on</label>
+        <input id="question-as-of" type="date" required>
+        <button type="submit">Ask</button>
+      </form>
+      <div id="question-view"></div>
+    </section>
     <section>
       <h2>Search policy sections</h2>
       <form id="search-form">
@@ -100,6 +117,7 @@ DEMO_PAGE = """<!DOCTYPE html>
   <script>
     const asOf = document.querySelector("#as-of");
     asOf.value = new Date().toISOString().slice(0, 10);
+    document.querySelector("#question-as-of").value = asOf.value;
     let caseId = null;
 
     function text(value) {
@@ -292,11 +310,154 @@ DEMO_PAGE = """<!DOCTYPE html>
       document.querySelector("#corpus").textContent = error.message;
     });
 
-    const linkedCase = location.hash.match(/^#case=([0-9a-f-]{36})$/i);
-    if (linkedCase) {
-      caseId = linkedCase[1];
+    const UNANSWERED_REASONS = {
+      no_relevant_source: "No policy in force on that date matched the question.",
+      model_reported_insufficient_sources: "The model said these sources do not answer the question.",
+      malformed_model_output: "The model did not return a usable answer.",
+    };
+    const FAILED_REASONS = {
+      model_answer_failed: "The model could not be reached. Check that the model server is running.",
+      question_attempts_exhausted: "The worker stopped before it could answer.",
+    };
+
+    function sourceLabel(source) {
+      return "[" + source.source + "] " + source.name + " v" + source.version + " " + source.section_ref +
+        (source.citation ? " · " + source.citation : "") +
+        (source.effective_from ? " · effective " + source.effective_from : "");
+    }
+
+    function sourceLink(source) {
+      const block = document.createElement("p");
+      block.className = "muted";
+      if (source.source_url && /^https:\\/\\//.test(source.source_url)) {
+        const link = document.createElement("a");
+        link.href = source.source_url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = sourceLabel(source);
+        block.append(link);
+      } else {
+        block.textContent = sourceLabel(source);
+      }
+      return block;
+    }
+
+    function renderQuestion(record, note) {
+      const view = document.querySelector("#question-view");
+      view.innerHTML = "";
+      const status = document.createElement("p");
+      status.className = "muted";
+      status.textContent = "Status: " + record.status + (note ? " · " + note : "") +
+        (record.retrieval_mode ? " · retrieval " + record.retrieval_mode : "") +
+        (record.model_name ? " · " + record.model_name : "") +
+        (record.latency_ms ? " · " + (record.latency_ms / 1000).toFixed(1) + " s" : "");
+      view.append(status);
+      const byNumber = new Map((record.sources || []).map((source) => [source.source, source]));
+      if (record.status === "answered") {
+        const answer = document.createElement("p");
+        answer.className = "answer";
+        answer.textContent = record.answer;
+        view.append(answer);
+        for (const citation of record.citations) {
+          const block = document.createElement("div");
+          block.className = "quote";
+          const quote = document.createElement("p");
+          quote.textContent = "“" + citation.quote + "”";
+          block.append(quote);
+          const source = byNumber.get(citation.source);
+          if (source) block.append(sourceLink(source));
+          view.append(block);
+        }
+      } else if (record.status === "unanswered") {
+        const reasons = new Set((record.validation_errors || []).map((code) =>
+          UNANSWERED_REASONS[code.split(":")[0]] ||
+          "The model's answer did not quote the sources accurately, so it is not shown."));
+        const message = document.createElement("p");
+        message.className = "answer";
+        message.textContent = "No supported answer. " + Array.from(reasons).join(" ");
+        view.append(message);
+      } else if (record.status === "failed") {
+        const message = document.createElement("p");
+        message.className = "error";
+        message.textContent = FAILED_REASONS[record.error_code] || "The question could not be answered.";
+        view.append(message);
+      }
+      if ((record.sources || []).length) {
+        const details = document.createElement("details");
+        details.open = record.status === "unanswered";
+        const summary = document.createElement("summary");
+        summary.textContent = "Sources the model was given (" + record.sources.length + ")";
+        details.append(summary);
+        for (const source of record.sources) {
+          const block = sourceLink(source);
+          if (source.heading) block.append(" · " + source.heading);
+          details.append(block);
+        }
+        view.append(details);
+      }
+      if ((record.injection_signals || []).length) {
+        const warning = document.createElement("p");
+        warning.className = "error";
+        warning.textContent = "The question contained instruction-like text; read the answer with care.";
+        view.append(warning);
+      }
+    }
+
+    const PENDING_QUESTION = ["queued", "answering"];
+
+    async function followQuestion(id) {
+      const started = Date.now();
+      let record = await readJson(await fetch("/api/v1/questions/" + id));
+      while (PENDING_QUESTION.includes(record.status)) {
+        const seconds = Math.round((Date.now() - started) / 1000);
+        if (seconds >= FOLLOW_LIMIT_SECONDS) {
+          renderQuestion(record, "no result after " + seconds + " s. Check the worker log, then reload.");
+          return record;
+        }
+        renderQuestion(record, record.status === "queued"
+          ? "waiting for a worker (" + seconds + " s)"
+          : "the model is answering (" + seconds + " s)");
+        await new Promise((resolve) => setTimeout(resolve, seconds < 15 ? 1000 : 3000));
+        record = await readJson(await fetch("/api/v1/questions/" + id));
+      }
+      renderQuestion(record);
+      return record;
+    }
+
+    document.querySelector("#question-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = event.target.querySelector("button");
+      const view = document.querySelector("#question-view");
+      button.disabled = true;
+      view.textContent = "Submitting…";
+      try {
+        const created = await readJson(await fetch("/api/v1/questions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            question: document.querySelector("#question").value,
+            as_of: document.querySelector("#question-as-of").value,
+          }),
+        }));
+        history.replaceState(null, "", "#question=" + created.id);
+        await followQuestion(created.id);
+      } catch (error) {
+        view.innerHTML = "<p class='error'></p>";
+        view.querySelector("p").textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    const linked = location.hash.match(/^#(case|question)=([0-9a-f-]{36})$/i);
+    if (linked && linked[1] === "case") {
+      caseId = linked[2];
       followCase(caseId).catch((error) => {
         document.querySelector("#case-view").textContent = error.message;
+      });
+    } else if (linked) {
+      followQuestion(linked[2]).catch((error) => {
+        document.querySelector("#question-view").textContent = error.message;
       });
     }
   </script>

@@ -48,7 +48,7 @@ def test_heartbeat_extends_a_lease_that_would_otherwise_expire(tmp_path: Path) -
         token = claimed.fencing_token
     with lease_heartbeat(
         engine,
-        case_id=case_id,
+        record_id=case_id,
         worker_id="heartbeat-worker",
         fencing_token=token,
         lease_seconds=30,

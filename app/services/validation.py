@@ -1,6 +1,7 @@
 import re
+from collections.abc import Sequence
 
-from app.domain.schemas import ModelAnalysis
+from app.domain.schemas import ModelAnalysis, ModelAnswer
 from app.services.retrieval import RetrievedPolicy
 
 MINIMUM_QUOTE_LENGTH = 20
@@ -68,6 +69,38 @@ def validate_analysis(
         if not any(_contains_word_bounded(passage, claim) for passage in cited_passages):
             errors.append(f"rationale_temporal_claim_not_cited:{claim}")
 
+    return errors
+
+
+def validate_answer(answer: ModelAnswer, sources: Sequence[RetrievedPolicy]) -> list[str]:
+    """Check a supported answer against the exact text of the sources the model was shown.
+
+    Citations name a source by its 1-based number. Every quote must appear word for word in
+    that source, and every date or duration in the answer must sit inside a cited quote.
+    An answer the model marked unsupported has nothing to check.
+    """
+    if not answer.supported:
+        return []
+    errors: list[str] = []
+    if not answer.citations:
+        errors.append("answer_without_citation")
+    cited_passages: list[str] = []
+    for citation in answer.citations:
+        if citation.source > len(sources):
+            errors.append(f"citation_not_retrieved:{citation.source}")
+            continue
+        normalized_quote = _normalize_whitespace(citation.quote)
+        if len(normalized_quote) < MINIMUM_QUOTE_LENGTH:
+            errors.append(f"citation_quote_too_short:{citation.source}")
+            continue
+        content = _normalize_whitespace(sources[citation.source - 1].content)
+        if not _contains_word_bounded(content, normalized_quote):
+            errors.append(f"citation_quote_not_found:{citation.source}")
+            continue
+        cited_passages.append(normalized_quote)
+    for claim in _extract_temporal_claims(answer.answer):
+        if not any(_contains_word_bounded(passage, claim) for passage in cited_passages):
+            errors.append(f"answer_temporal_claim_not_cited:{claim}")
     return errors
 
 

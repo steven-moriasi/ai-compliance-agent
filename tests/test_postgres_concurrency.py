@@ -21,12 +21,14 @@ from app.domain.models import (
     Document,
     NotificationOutbox,
     Policy,
+    PolicyQuestion,
     PromptTemplate,
 )
 from app.services.analysis import AnalysisService
 from app.services.cases import claim_next_case, reap_expired_cases
 from app.services.notifications import claim_notification, deliver_notification
 from app.services.providers import DeterministicProvider, ModelRequest, ModelResponse
+from app.services.questions import claim_next_question
 
 pytestmark = pytest.mark.postgres
 
@@ -322,3 +324,33 @@ def test_expired_notification_is_reclaimed_with_new_fencing_token(
                 )
                 assert delivered.status == NotificationStatus.SENT
                 assert delivered.fencing_token == 2
+
+
+def test_concurrent_question_claims_take_different_questions(
+    postgres_session_factory: sessionmaker[Session],
+) -> None:
+    with postgres_session_factory() as session:
+        session.add_all(
+            PolicyQuestion(
+                question=f"How long are records kept? ({number})",
+                as_of=datetime.now(UTC).date(),
+                requested_by="test-suite",
+            )
+            for number in range(3)
+        )
+        session.commit()
+    barrier = Barrier(4)
+
+    def claim(worker_id: str) -> tuple[str, int] | None:
+        barrier.wait()
+        with postgres_session_factory() as session:
+            claimed = claim_next_question(session, worker_id, 120, f"claim-{worker_id}")
+            return None if claimed is None else (claimed.id, claimed.fencing_token)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(claim, [f"question-worker-{index}" for index in range(4)]))
+
+    claimed = [result for result in results if result is not None]
+    assert len(claimed) == 3
+    assert len({question_id for question_id, _ in claimed}) == 3
+    assert all(token == 1 for _, token in claimed)

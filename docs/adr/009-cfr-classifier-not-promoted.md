@@ -24,18 +24,18 @@ the mean fraction of those parts found in the first three predictions.
 
 | Model | Top-1 hit rate | Recall@3 |
 | --- | --- | --- |
-| majority | 0.5252525252525253 | 0.7676767676767676 |
-| naive Bayes | 0.8383838383838383 | 0.9494949494949495 |
-| TF-IDF logistic regression | 0.8484848484848485 | 0.9595959595959596 |
-| MLP | 0.8383838383838383 | 0.9090909090909091 |
+| majority | 0.525 | 0.768 |
+| naive Bayes | 0.838 | 0.949 |
+| TF-IDF logistic regression | 0.848 | 0.960 |
+| MLP | 0.838 | 0.909 |
 
 The MLP ties naive Bayes on top-1 and is below both naive Bayes and logistic regression on
 Recall@3. Logistic regression is the strongest of the four on both metrics. The majority top-1
-of 0.5252525252525253 is the `40:52` share of the test window.
+of 0.525 is the `40:52` share of the test window.
 
-Gold population stability between the two windows is 0.6884761992732462. The cutoff in code is
-0.25, so `gold_drifted` is true. The TF-IDF mean still moved: L2 shift 0.141372630378354, with
-the first two principal directions explaining 0.1557835877068428 and 0.02764487295965721 of
+Gold population stability between the two windows is 0.688. The cutoff in code is
+0.25, so `gold_drifted` is true. The TF-IDF mean still moved: L2 shift 0.141, with
+the first two principal directions explaining 0.156 and 0.028 of
 training variance. Five trained labels (`40:1037`, `40:372`, `40:721`, `40:86`, `40:9`) do not
 appear in the test window.
 

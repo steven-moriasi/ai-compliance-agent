@@ -159,6 +159,17 @@ Do not manually mark a case approved or bypass review to clear a queue.
 5. Inspect attempt counts and preserve exhausted cases as evidence.
 6. Submit a new case only after correcting the underlying condition.
 
+## Incident: questions come back unanswered
+
+1. Open the question's sources on the demo page. If none are listed, no policy in force on the
+   chosen date matched; check the date and the loaded corpus.
+2. `model_reported_insufficient_sources` means the model read the sources and declined. Read them;
+   the answer may need a section ranked below `QUESTION_SOURCE_LIMIT`.
+3. `citation_quote_not_found` after a retry means the model paraphrased instead of quoting. Try a
+   larger model before loosening the check.
+4. If many answers fail at once, confirm the prompt is not being truncated: the sources and
+   instructions must fit `OLLAMA_CONTEXT_LENGTH`.
+
 ## Incident: model output is rejected
 
 1. Identify whether the failure is transport, empty response, JSON parsing, or schema validation.

@@ -18,7 +18,6 @@ from app.services.audit import append_audit_event
 from app.services.classifier import CfrPrior
 from app.services.embeddings import (
     Embedder,
-    RetrievalUnavailable,
     embedding_model_id,
     sentence_transformer_embedder,
 )
@@ -31,12 +30,7 @@ from app.services.providers import (
     ModelResponse,
 )
 from app.services.redaction import redact_personal_data
-from app.services.retrieval import (
-    RetrievalMode,
-    RetrievedPolicy,
-    resolve_retrieval_mode,
-    retrieve_policies,
-)
+from app.services.retrieval import RetrievedPolicy, retrieve_with_fallback
 from app.services.validation import validate_analysis
 
 MODEL_FIXABLE_ERRORS = frozenset(
@@ -79,7 +73,7 @@ class AnalysisService:
         engine = bind.engine if isinstance(bind, Connection) else bind
         return lease_heartbeat(
             engine,
-            case_id=case.id,
+            record_id=case.id,
             worker_id=worker_id,
             fencing_token=case.fencing_token,
             lease_seconds=self.settings.analysis_lease_seconds,
@@ -98,61 +92,33 @@ class AnalysisService:
         correlation_id: str,
         worker_id: str,
     ) -> list[RetrievedPolicy]:
-        bind = self.session.get_bind()
-        dialect = bind.dialect.name if bind is not None else "sqlite"
-        selected = resolve_retrieval_mode(self.settings.retrieval_mode, dialect)
-        model_id = embedding_model_id(
-            self.settings.embedding_model,
-            self.settings.embedding_revision,
-        )
-        embedder: Embedder | None = None
-        if selected in {"vector", "embedding", "hybrid"}:
-            try:
-                embedder = self._embedder_loader()
-            except RetrievalUnavailable as exc:
-                return self._fallback(case, correlation_id, worker_id, selected, dialect, str(exc))
-        try:
-            return retrieve_policies(
-                self.session,
-                case.document.content,
-                case.created_at.date(),
-                mode=self.settings.retrieval_mode,
-                embedder=embedder,
-                embedding_model_id=model_id,
-                cfr_prior=self.cfr_prior,
-            )
-        except RetrievalUnavailable as exc:
-            if selected not in {"vector", "embedding", "hybrid"}:
-                raise
-            return self._fallback(case, correlation_id, worker_id, selected, dialect, str(exc))
-
-    def _fallback(
-        self,
-        case: ComplianceCase,
-        correlation_id: str,
-        worker_id: str,
-        selected: str,
-        dialect: str,
-        reason: str,
-    ) -> list[RetrievedPolicy]:
-        """Lexical search keeps the case moving when the embedding index cannot be used."""
-        RETRIEVAL_FALLBACKS.inc()
-        append_audit_event(
-            self.session,
-            event_type="retrieval_fallback",
-            actor_id=worker_id,
-            correlation_id=correlation_id,
-            case_id=case.id,
-            details={"from_mode": selected, "reason": reason[:240]},
-        )
-        fallback: RetrievalMode = "fulltext" if dialect == "postgresql" else "keyword"
-        return retrieve_policies(
+        result = retrieve_with_fallback(
             self.session,
             case.document.content,
             case.created_at.date(),
-            mode=fallback,
+            requested=self.settings.retrieval_mode,
+            embedder_loader=self._embedder_loader,
+            embedding_model_id=embedding_model_id(
+                self.settings.embedding_model,
+                self.settings.embedding_revision,
+            ),
             cfr_prior=self.cfr_prior,
         )
+        if result.fallback_from is not None:
+            # Lexical search keeps the case moving when the embedding index cannot be used.
+            RETRIEVAL_FALLBACKS.inc()
+            append_audit_event(
+                self.session,
+                event_type="retrieval_fallback",
+                actor_id=worker_id,
+                correlation_id=correlation_id,
+                case_id=case.id,
+                details={
+                    "from_mode": result.fallback_from,
+                    "reason": (result.fallback_reason or "")[:240],
+                },
+            )
+        return result.policies
 
     def analyze(
         self,

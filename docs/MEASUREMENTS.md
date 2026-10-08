@@ -213,15 +213,15 @@ documents, 409 train and 99 test remained. 65 train and 15 test documents were d
 
 | Model | Top-1 hit rate | Recall@3 | Elapsed seconds |
 | --- | --- | --- | --- |
-| majority | 0.5252525252525253 | 0.7676767676767676 | 0.00013399997260421515 |
-| naive Bayes | 0.8383838383838383 | 0.9494949494949495 | 1.6352010000264272 |
-| TF-IDF logistic regression | 0.8484848484848485 | 0.9595959595959596 | 2.522956599947065 |
-| MLP | 0.8383838383838383 | 0.9090909090909091 | 0.37268259993288666 |
+| majority | 0.525 | 0.768 | 0.0001 |
+| naive Bayes | 0.838 | 0.949 | 1.64 |
+| TF-IDF logistic regression | 0.848 | 0.960 | 2.52 |
+| MLP | 0.838 | 0.909 | 0.37 |
 
 Logistic regression ran before the MLP, so its elapsed time includes first-use CPU work after
 the torch import. The MLP ties naive Bayes on top-1 and is lower on Recall@3. Logistic regression
-is ahead of both. Gold population stability is 0.6884761992732462, above the 0.25 cutoff, so the
-report marks the label mix as drifted. PCA L2 mean shift is 0.141372630378354. The promotion
+is ahead of both. Gold population stability is 0.688, above the 0.25 cutoff, so the
+report marks the label mix as drifted. PCA L2 mean shift is 0.141. The promotion
 gate refused the MLP. [ADR 009](adr/009-cfr-classifier-not-promoted.md) leaves it out of review
 and out of default retrieval. Weights remain in gitignored `data/models/`.
 
