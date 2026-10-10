@@ -45,7 +45,7 @@ shipped, not controls supplied by a future cloud platform.
 | Tampering | model cites an unrelated section | citation must reference retrieved policy/version/section and quote text from that section | quote presence does not prove correct interpretation; evaluate retrieval recall |
 | Tampering | stale worker overwrites recovery | lease, worker identity, and monotonically increasing fencing token | database time should replace application time across regions |
 | Repudiation | reviewer denies decision | actor ID, rationale, analysis hash, timestamp, and audit event | use append-only/WORM export and signed audit batches |
-| Information disclosure | provider exception leaks secrets | stable public error code and redacted message | add centralized log redaction and provider data-retention agreement |
+| Information disclosure | provider exception leaks secrets | stable public error code, redacted message, personal data redacted in logs | extend redaction beyond email, card, SSN and US phone formats; agree provider data retention |
 | Information disclosure | oversized document exhausts resources | configured byte limit before persistence | add gateway body limit, malware scanning, classification, and retention |
 | Denial of service | duplicate case flood | idempotency key plus database uniqueness | add per-identity rate and quota enforcement |
 | Denial of service | worker repeatedly crashes | bounded leases, recovery, and attempt limit | alert on queue age, failure rate, and exhausted attempts |
@@ -107,7 +107,8 @@ A production owner must define:
 - encryption-key ownership and rotation;
 - provider training and retention opt-out terms;
 - access reviews for reviewers and database operators;
-- redaction or tokenization before provider transmission.
+- which personal-data formats must be redacted or tokenized before provider transmission, beyond
+  the email, card, SSN and US phone formats already covered.
 
 The reference application intentionally does not claim compliance with a named regulatory regime.
 

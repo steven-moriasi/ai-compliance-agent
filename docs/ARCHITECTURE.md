@@ -51,15 +51,22 @@ flowchart TD
     Decision --> Outbox[Enqueue notification in same transaction]
 ```
 
-The retrieval implementation is deliberately deterministic and inspectable. It filters active
-policy versions to half-open effective windows (`effective_from <= case_date < effective_to`) and
-ranks their sections by lexical overlap. Missing bounds are open, and policies without explicit
-sections use a `document` fallback section. The current case date is the case creation date.
+Retrieval filters active policy versions to half-open effective windows
+(`effective_from <= case_date < effective_to`). Missing bounds are open, and policies without
+explicit sections use a `document` fallback section. On PostgreSQL, sections are ranked by hybrid
+search: full text and pgvector similarity combined by reciprocal rank fusion, falling back to full
+text when the embedding model or index is missing ([ADR 007](adr/007-postgres-fulltext-and-pgvector.md),
+[ADR 008](adr/008-hybrid-retrieval-default.md)). SQLite keeps lexical overlap as the inspectable
+baseline. The current case date is the case creation date.
 
 Each citation identifies a policy ID, policy version, and section reference. Deterministic
 validation resolves that exact source and requires the normalized quote to occur within that
-section. Quote presence establishes source traceability, not correct interpretation. Lexical
-ranking is suitable as a reference boundary, not as a claim of semantic retrieval quality.
+section. Quote presence establishes source traceability, not correct interpretation. Retrieval
+quality is measured on the sets in `evals/retrieval/`, not proven in general.
+
+Policy questions reuse the same retrieval and quote check. The worker answers them from numbered,
+trimmed sources and shows an answer only when every quote is found in the source it names
+([ADR 010](adr/010-grounded-policy-answers.md)).
 
 Malformed structured output and model-fixable citation findings receive at most one retry with
 validation feedback. Provider failures are not retried inside the analysis attempt, and missing

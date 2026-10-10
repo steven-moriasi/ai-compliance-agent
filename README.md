@@ -80,7 +80,9 @@ threat model, failure model, operational runbook, architecture decisions, and ro
 
 - The repository does not establish production scale, availability, recovery, or incident outcomes.
 - It does not establish legal or regulatory correctness, certification, or formal assurance.
-- It does not establish model quality, fairness, or semantic retrieval quality.
+- Retrieval quality is measured on one Federal Register corpus and two evaluation sets
+  ([ADR 008](docs/adr/008-hybrid-retrieval-default.md)), not in general. Answer quality and fairness
+  are not established; `python -m evals.answer_eval` measures answers on a loaded corpus.
 - Exact quote presence does not prove that a model or reviewer interpreted the source correctly.
 - Federal Register rules can be loaded into the catalog. The loader does not prove that a cached
   file is the authentic GovInfo publication.

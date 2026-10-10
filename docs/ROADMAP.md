@@ -5,8 +5,9 @@ are ordered by risk reduction rather than feature volume.
 
 ## Current production gaps
 
-- Policy sections are manually entered; there is no authenticated publication ingest, source
-  signature, immutable source artifact, provenance chain, or section-to-source consistency check.
+- Federal Register documents load from the public API with versioned dataset manifests, but the
+  loader does not prove that a cached file is the authentic GovInfo publication, and there is no
+  provenance chain or section-to-source consistency check.
 - The case date is derived from creation time. There is no explicit applicability date,
   jurisdiction, regulated-entity profile, or transitional-rule model.
 - Effective windows are filtered but overlapping active versions and conflicting sections are not
@@ -25,8 +26,9 @@ are ordered by risk reduction rather than feature volume.
 
 ## Near term: evaluation and evidence
 
-- Add measurable retrieval recall and analysis criteria using reviewed source fixtures without
-  representing model confidence as ground truth.
+- Retrieval recall is measured on two sets. Add the section-level set, and analysis and answer
+  criteria from reviewed source fixtures, without representing model confidence as ground truth.
+- Record answer quality for the local model with `python -m evals.answer_eval`.
 - Add conflicting-version, ambiguous-section, jurisdiction, and applicability-date cases to the
   versioned corpus.
 - Exercise OIDC validation against a disposable JWKS server, including rotation, expiry, issuer,
@@ -41,7 +43,9 @@ are ordered by risk reduction rather than feature volume.
 - Lease renewal during retrieval and provider calls is implemented. Database time, instead of
   the application clock, is not.
 - Add queue-age, review-age, dead-letter, token, and estimated-cost metrics.
-- Add structured logging with correlation IDs and explicit sensitive-field redaction.
+- Personal data is redacted in logs and before model calls (emails, card numbers, SSNs, US phone
+  numbers). Add structured logging with correlation IDs, and patterns for other regions' phone
+  and ID formats.
 - Add controlled dead-letter re-drive with an operator audit event.
 - Add graceful shutdown so workers stop claiming work and finish or relinquish active leases.
 - Add backup-restore exercises and migration compatibility checks across releases.
